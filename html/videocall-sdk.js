@@ -84,7 +84,7 @@ VideoCall.prototype.callOnEvent = function (e, t) {
 }
 
 // connect to server
-VideoCall.prototype.connect = function (token_auth, callback) {
+VideoCall.prototype.connect = function (account, token_auth, callback) {
     var self = this;
     self.janus = new Janus(
         {
@@ -99,7 +99,9 @@ VideoCall.prototype.connect = function (token_auth, callback) {
                         success: function (pluginHandle) {
                             self.plugin = pluginHandle;
                             self.isAttached = true;
-                            self.callOnEvent('connected');
+                            //self.callOnEvent('connected');
+                            var register = { "request": "register", "username": account };
+                            self.plugin.send({ "message": register });
                             Janus.log("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
                         },
                         onlocalstream: function (stream) {
@@ -118,13 +120,9 @@ VideoCall.prototype.connect = function (token_auth, callback) {
                                 if (result["event"] !== undefined && result["event"] !== null) {
                                     var event = result["event"];
                                     if (event === 'connected') {
-                                        self.callOnEvent('connected');
-                                        Janus.lengthog("Successfully connected!")
-                                    }
-                                    else if (event === 'registered') {
                                         self.myname = result["username"];
-                                        self.callOnEvent('registered', self.myname);
-                                        Janus.log("Successfully registered as " + self.myname + "!");
+                                        Janus.log("Successfully connected as username: " + self.myname + "!")
+                                        callback.success();
                                     } else if (event === 'calling') {
                                         Janus.log("Waiting for the peer to answer...");
                                         self.callOnEvent('calling');
@@ -176,13 +174,21 @@ VideoCall.prototype.connect = function (token_auth, callback) {
                                     }
                                 }
                             } else {
+                                // FIXME Error?
+                                var error = msg["error"];
+                                bootbox.alert(error + " test");
+                                if (error.indexOf("already taken") > 0) {
+                                    // FIXME Use status codes...
+                                    callback.error("Username has already taken");
+                                }
+                                // TODO Reset status
+                                self.plugin.hangup();
                             }
                         },
                         error: function (error) {
                             Janus.error("  -- Error attaching plugin...", error);
                         }
                     });
-                callback.success();
             },
             error: function (error) {
                 callback.error(error);
@@ -259,7 +265,7 @@ VideoCall.prototype.mute = function (isMuted) {
 }
 
 // disable video
-VideoCall.prototype.enableVideo = function(isEnable){
+VideoCall.prototype.enableVideo = function (isEnable) {
     this.videoenabled = isEnable;
     this.plugin.send({ "message": { "request": "set", "video": this.videoenabled } });
 }

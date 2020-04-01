@@ -37,9 +37,14 @@
             videocall.init({
                 success: function () {
                     settingEventCall(videocall);
-                    videocall.connect(token, {
+                    videocall.connect(username, token, {
                         success: function () {
                             console.log("Video Call connected...");
+                            console.log("User " + username + "registered!")
+                            $('#youok').removeClass('hide').show().html("Registered as '" + username + "'");
+                            $('#phone').removeClass('hide').show();
+                            $('#call').unbind('click').click(doCall);
+                            $('#peer').focus();
                         },
                         error: function (error) {
                             console.log("Video Call could not connect: " + error);
@@ -60,9 +65,12 @@
                 $('#call').unbind('click').click(doCall);
                 $('#peer').focus();
             });
-            videocall.on('connected', function (test) {
-                console.log("Register user: " + username);
-                videocall.register(username);
+            videocall.on('connected', function (username) {
+                console.log("User " + username + "registered!")
+                $('#youok').removeClass('hide').show().html("Registered as '" + username + "'");
+                $('#phone').removeClass('hide').show();
+                $('#call').unbind('click').click(doCall);
+                $('#peer').focus();
             });
             videocall.on('calling', function () {
                 bootbox.alert("Waiting for the peer to answer...");
@@ -197,9 +205,9 @@
             videoInput.play();
             var options = {
                 stream: localStream,
-                isVideoCall: true,
-                isRecording: true,
-                duration: 5
+                isVideoCall: true
+                // isRecording: true,
+                // duration: 5
             };
             videocall.makeCall(username, options);
         }

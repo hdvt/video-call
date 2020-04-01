@@ -264,7 +264,6 @@
 #include "../rtcp.h"
 #include "../sdp-utils.h"
 #include "../utils.h"
-
 /* Plugin information */
 #define JANUS_VIDEOCALL_VERSION 6
 #define JANUS_VIDEOCALL_VERSION_STRING "0.0.6"
@@ -401,19 +400,21 @@ typedef struct janus_user_session
 	struct janus_user_session *peer;
 	janus_rtp_switching_context context;
 	uint32_t ssrc[3]; /* Only needed in case VP8 (or H.264) simulcasting is involved */
-	char *rid[3];	 /* Only needed if simulcasting is rid-based */
+	char *rid[3];	  /* Only needed if simulcasting is rid-based */
 	janus_rtp_simulcasting_context sim_context;
 	janus_vp8_simulcast_context vp8_context;
 	janus_recorder *arc;   /* The Janus recorder instance for this user's audio, if enabled */
 	janus_recorder *vrc;   /* The Janus recorder instance for this user's video, if enabled */
 	janus_recorder *drc;   /* The Janus recorder instance for this user's data, if enabled */
 	janus_mutex rec_mutex; /* Mutex to protect the recorders from race conditions */
+	volatile gint has_started;
 	volatile gint incall;
 	volatile gint hangingup;
 	volatile gint destroyed;
 	janus_refcount ref;
 } janus_user_session;
 static GHashTable *sessions;
+static GHashTable *users = NULL;
 static janus_mutex sessions_mutex = JANUS_MUTEX_INITIALIZER;
 
 static void janus_user_session_destroy(janus_user_session *session)
@@ -463,6 +464,10 @@ static void janus_videocall_message_free(janus_videocall_message *msg)
 	msg->jsep = NULL;
 
 	g_free(msg);
+}
+
+static void janus_auth_free_user(char *user) {
+	g_free(user);
 }
 
 static void janus_videocall_record_free(janus_videocall_record *record)
@@ -555,6 +560,8 @@ int janus_videocall_init(janus_callbacks *callback, const char *config_path)
 	config = NULL;
 
 	sessions = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, (GDestroyNotify)janus_user_session_destroy);
+	users = g_hash_table_new_full(g_str_hash, g_str_equal, (GDestroyNotify)janus_auth_free_user, NULL);
+	
 	messages = g_async_queue_new_full((GDestroyNotify)janus_videocall_message_free);
 	records = g_async_queue_new_full((GDestroyNotify)janus_videocall_record_free);
 	record_dir = g_strdup("/home/bangtv2/MySpace/Working/Develop/video-call/plugins/videocall_record");
@@ -674,6 +681,7 @@ void janus_videocall_create_session(janus_plugin_session *handle, int *error)
 	janus_rtp_simulcasting_context_reset(&session->sim_context);
 	janus_vp8_simulcast_context_reset(&session->vp8_context);
 	janus_mutex_init(&session->rec_mutex);
+	g_atomic_int_set(&session->has_started, 0);
 	g_atomic_int_set(&session->incall, 0);
 	g_atomic_int_set(&session->hangingup, 0);
 	g_atomic_int_set(&session->destroyed, 0);
@@ -809,10 +817,10 @@ void janus_videocall_setup_media(janus_plugin_session *handle)
 		JANUS_LOG(LOG_ERR, "No session associated with this handle...\n");
 		return;
 	}
-
+	g_atomic_int_set(&session->has_started, 1);
 	janus_videocall_session *call = session->call;
 	janus_mutex_lock(&call->mutex);
-	if (call->isStarted == FALSE)
+	if (call->isStarted == FALSE && g_atomic_int_get(&session->peer->has_started))
 	{
 		call->isStarted = TRUE;
 		call->start_time = janus_get_monotonic_time();
@@ -888,7 +896,7 @@ void janus_videocall_setup_media(janus_plugin_session *handle)
 				/* Send a PLI */
 				JANUS_LOG(LOG_VERB, "Recording video, sending a PLI to kickstart it\n");
 				gateway->send_pli(session->peer->handle);
-				JANUS_LOG(LOG_ERR, "Video codec of peer 2: %s\n", janus_videocodec_name(session->peer->vcodec));
+				JANUS_LOG(LOG_VERB, "Video codec of peer 2: %s\n", janus_videocodec_name(session->peer->vcodec));
 			}
 			janus_mutex_unlock(&session->peer->rec_mutex);
 		}
@@ -1288,6 +1296,7 @@ void janus_videocall_hangup_media(janus_plugin_session *handle)
 	}
 	janus_rtp_switching_context_reset(&session->context);
 	g_atomic_int_set(&session->hangingup, 0);
+	g_atomic_int_set(&session->has_started, 0);
 }
 
 /* Thread to handle incoming messages */
@@ -1406,13 +1415,13 @@ static void *janus_videocall_handler(void *data)
 			g_hash_table_insert(sessions, (gpointer)session->username, session);
 			janus_mutex_unlock(&sessions_mutex);
 			result = json_object();
-			json_object_set_new(result, "event", json_string("registered"));
+			json_object_set_new(result, "event", json_string("connected"));
 			json_object_set_new(result, "username", json_string(username_text));
 			/* Also notify event handlers */
 			if (notify_events && gateway->events_is_enabled())
 			{
 				json_t *info = json_object();
-				json_object_set_new(info, "event", json_string("registered"));
+				json_object_set_new(info, "event", json_string("connected"));
 				json_object_set_new(info, "username", json_string(username_text));
 				gateway->notify_event(&janus_videocall_plugin, session->handle, info);
 			}
@@ -1677,6 +1686,7 @@ static void *janus_videocall_handler(void *data)
 					}
 				}
 			}
+
 			/* Check which codecs we ended up using */
 			const char *acodec = NULL, *vcodec = NULL;
 			janus_sdp_find_first_codecs(answer, &acodec, &vcodec);
@@ -1713,13 +1723,15 @@ static void *janus_videocall_handler(void *data)
 			json_object_set_new(calling, "username", json_string(session->username));
 			json_object_set_new(call, "result", calling);
 			g_atomic_int_set(&session->hangingup, 0);
-			int ret = gateway->push_event(peer->handle, &janus_videocall_plugin, NULL, call, jsep);
+
+			int ret = gateway->push_event(peer->handle, &janus_videocall_plugin, NULL, call, jsep);	
 			JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
 			json_decref(call);
 			json_decref(jsep);
 			/* Send an ack back */
 			result = json_object();
 			json_object_set_new(result, "event", json_string("accepted"));
+
 			/* Also notify event handlers */
 			if (notify_events && gateway->events_is_enabled())
 			{
@@ -2166,8 +2178,7 @@ static void *janus_videocall_record_handler(void *data)
 		JANUS_LOG(LOG_ERR, "Excuting shell script: %s\n", record_script);
 		if (system(record_script) == -1)
 			JANUS_LOG(LOG_ERR, "Record failed...\n");
-		else 
+		else
 			JANUS_LOG(LOG_ERR, "Record successfully...\n");
-
 	}
 }
