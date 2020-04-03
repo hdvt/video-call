@@ -264,6 +264,7 @@
 #include "../rtcp.h"
 #include "../sdp-utils.h"
 #include "../utils.h"
+#include "../auth.h"
 /* Plugin information */
 #define JANUS_VIDEOCALL_VERSION 6
 #define JANUS_VIDEOCALL_VERSION_STRING "0.0.6"
@@ -1409,6 +1410,14 @@ static void *janus_videocall_handler(void *data)
 				g_snprintf(error_cause, 512, "Username '%s' already taken", username_text);
 				goto error;
 			}
+			if (!janus_auth_check_token(username_text))
+			{
+				janus_mutex_unlock(&sessions_mutex);
+				JANUS_LOG(LOG_ERR, "Username '%s' hasn't registeded a token\n", username_text);
+				error_code = JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN;
+				g_snprintf(error_cause, 512, "Username '%s' has not registeded a token", username_text);
+				goto error;
+			}
 			janus_mutex_unlock(&sessions_mutex);
 			session->username = g_strdup(username_text);
 			janus_mutex_lock(&sessions_mutex);
@@ -2148,7 +2157,7 @@ static void *janus_videocall_handler(void *data)
 }
 static void *janus_videocall_record_handler(void *data)
 {
-	JANUS_LOG(LOG_ERR, "Joining VideoCall record handler thread\n");
+	JANUS_LOG(LOG_INFO, "Joining VideoCall record handler thread...\n");
 	janus_videocall_record *record = NULL;
 	int error_code = 0;
 	char error_cause[512];

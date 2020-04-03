@@ -84,12 +84,12 @@ VideoCall.prototype.callOnEvent = function (e, t) {
 }
 
 // connect to server
-VideoCall.prototype.connect = function (account, token_auth, callback) {
+VideoCall.prototype.connect = function (account, callback) {
     var self = this;
     self.janus = new Janus(
         {
             server: this.server,
-            token: token_auth,
+            token: account,
             success: function () {
                 self.isConnected = true;
                 self.janus.attach(

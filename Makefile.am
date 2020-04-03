@@ -91,6 +91,8 @@ janus_SOURCES = \
 	apierror.h \
 	auth.c \
 	auth.h \
+	database.c \
+	database.h \
 	cmdline.c \
 	cmdline.h \
 	config.c \
