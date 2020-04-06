@@ -40,6 +40,7 @@ function HashMap() {
 
 // VideoCall class
 function VideoCall() {
+    this.isInited = false;
     this.media_server = null;
     this.admin_server = null;
     this.janus = null;
@@ -71,6 +72,7 @@ VideoCall.prototype.init = function (callback) {
             this.admin_server = "http://" + window.location.hostname + ":7088/admin";
             this.plugin_name = "janus.plugin.videocall";
             this._onMethods = new HashMap();
+            this.isInited = true;
             callback.success();
         }).bind(this)
     });
@@ -87,6 +89,10 @@ VideoCall.prototype.callOnEvent = function (e, t) {
     r ? t ? r.call(this, t) : r.call(this) : console.log("Please implement event: " + e)
 }
 
+// check init
+VideoCall.prototype.isInit = function() {
+    return this.isInited;
+}
 // connect to server
 VideoCall.prototype.connect = function (account, callback) {
     var self = this;
