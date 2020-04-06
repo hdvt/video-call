@@ -13,7 +13,6 @@ docs/html/
 /loggers/*.so
 
 Makefile
-Makefile.in
 /build
 /configure
 /autom4te.cache
