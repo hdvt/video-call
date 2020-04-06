@@ -340,7 +340,13 @@ loggers: {
 # between statistics for each handle. Setting it to 0 disables them (but
 # not other media-related events).
 events: {
-	#broadcast = true
+	#broadcast = false
 	#disable = "libjanus_sampleevh.so"
 	#stats_period = 5
+}
+database: {
+	hostname: "localhost"
+	username: "root"
+	password: "Bangtran123@"
+	dbname: "video-call"
 }
