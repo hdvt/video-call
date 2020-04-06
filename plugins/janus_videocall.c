@@ -532,7 +532,6 @@ int janus_videocall_init(janus_callbacks *callback, const char *config_path)
 		/* Invalid arguments */
 		return -1;
 	}
-
 	/* Read configuration */
 	char filename[255];
 	g_snprintf(filename, 255, "%s/%s.jcfg", config_path, JANUS_VIDEOCALL_PACKAGE);
@@ -1384,14 +1383,14 @@ static void *janus_videocall_handler(void *data)
 			json_object_set_new(result, "list", list);
 			janus_mutex_unlock(&sessions_mutex);
 		}
-		else if (!strcasecmp(request_text, "register"))
+		else if (!strcasecmp(request_text, "login"))
 		{
 			/* Map this handle to a username */
 			if (session->username != NULL)
 			{
-				JANUS_LOG(LOG_ERR, "Already registered (%s)\n", session->username);
+				JANUS_LOG(LOG_ERR, "Already logged-in (%s)\n", session->username);
 				error_code = JANUS_VIDEOCALL_ERROR_ALREADY_REGISTERED;
-				g_snprintf(error_cause, 512, "Already registered (%s)", session->username);
+				g_snprintf(error_cause, 512, "Already logged-in  (%s)", session->username);
 				goto error;
 			}
 			JANUS_VALIDATE_JSON_OBJECT(root, username_parameters,
@@ -1405,9 +1404,9 @@ static void *janus_videocall_handler(void *data)
 			if (g_hash_table_lookup(sessions, username_text) != NULL)
 			{
 				janus_mutex_unlock(&sessions_mutex);
-				JANUS_LOG(LOG_ERR, "Username '%s' already taken\n", username_text);
+				JANUS_LOG(LOG_ERR, "Username '%s' already logged-in \n", username_text);
 				error_code = JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN;
-				g_snprintf(error_cause, 512, "Username '%s' already taken", username_text);
+				g_snprintf(error_cause, 512, "Username '%s' already logged-in ", username_text);
 				goto error;
 			}
 			if (!janus_auth_check_token(username_text))

@@ -40,9 +40,11 @@ function HashMap() {
 
 // VideoCall class
 function VideoCall() {
-    this.server = null;
+    this.media_server = null;
+    this.admin_server = null;
     this.janus = null;
     this.plugin = null;
+    this.plugin_name = null;
     this._onMethods = null;
     this.myname = null;
     this.peername = null;
@@ -65,11 +67,13 @@ VideoCall.prototype.init = function (callback) {
     Janus.init({
         debug: true,
         callback: (function () {
-            this.server = "http://" + window.location.hostname + ":8088/janus";
+            this.media_server = "http://" + window.location.hostname + ":8088/janus";
+            this.admin_server = "http://" + window.location.hostname + ":7088/admin";
+            this.plugin_name = "janus.plugin.videocall";
             this._onMethods = new HashMap();
+            callback.success();
         }).bind(this)
     });
-    callback.success();
 }
 
 // add event to _onMethods 
@@ -88,19 +92,19 @@ VideoCall.prototype.connect = function (account, callback) {
     var self = this;
     self.janus = new Janus(
         {
-            server: this.server,
+            server: this.media_server,
             token: account,
             success: function () {
                 self.isConnected = true;
                 self.janus.attach(
                     {
-                        plugin: "janus.plugin.videocall",
+                        plugin: self.plugin_name,
                         opaqueId: "videocalltest-" + Janus.randomString(12),
                         success: function (pluginHandle) {
                             self.plugin = pluginHandle;
                             self.isAttached = true;
                             //self.callOnEvent('connected');
-                            var register = { "request": "register", "username": account };
+                            var register = { "request": "login", "username": account };
                             self.plugin.send({ "message": register });
                             Janus.log("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
                         },
@@ -200,9 +204,28 @@ VideoCall.prototype.connect = function (account, callback) {
 }
 
 // register user
-VideoCall.prototype.register = function (username) {
-    var register = { "request": "register", "username": username };
-    this.plugin.send({ "message": register });
+VideoCall.prototype.register = function (token, callback) {
+    var self = this;
+    var request = { "janus": "add_token", "token": token, plugins: ["janus.plugin.videocall"], "transaction": Janus.randomString(12), "admin_secret": "1231234" };
+    $.ajax({
+        type: 'POST',
+        url: self.admin_server,
+        cache: false,
+        contentType: "application/json",
+        data: JSON.stringify(request),
+        success: function (json) {
+            if (json["janus"] !== "success") {
+                callback.error(json["error"].code + " - " + json["error"].reason);
+                return;
+            } else {
+                callback.success();
+            }
+        },
+        error: function (XMLHttpRequest, textStatus, errorThrown) {
+            callback.error(textStatus + ": " + errorThrown);
+        },
+        dataType: "json"
+    });
 }
 
 // make a call

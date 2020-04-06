@@ -27,73 +27,42 @@
         var videoOutput;
         var localstream;
         var videocall;
-        var token = 'add_token_3';
         $(document).ready(function () {
-            username = Math.random().toString(36).substring(7);
-            registerToken(username, function () {
-                videoInput = document.getElementById('myvideo');
-                videoOutput = document.getElementById('remotevideo');
-                openStreamAction();
-                videocall = new VideoCall();
-                videocall.init({
-                    success: function () {
-                        settingEventCall(videocall);
-                        videocall.connect(username, {
-                            success: function () {
-                                console.log("Video Call connected...");
-                                console.log("User " + username + "registered!")
-                                $('#youok').removeClass('hide').show().html("Registered as '" + username + "'");
-                                $('#phone').removeClass('hide').show();
-                                $('#call').unbind('click').click(doCall);
-                                $('#peer').focus();
-                            },
-                            error: function (error) {
-                                console.log("Video Call could not connect: " + error);
-                            }
-                        })
-                    },
-                    error: function (error) {
-                        console.log("Video Call could not init: " + error);
-                    }
-                });
-            });
+            videocall = new VideoCall();
+            videocall.init({
+                success: function () {
+                    username = Math.random().toString(36).substring(7);
+                    videocall.register(username, {
+                        success: function () {
+                            videoInput = document.getElementById('myvideo');
+                            videoOutput = document.getElementById('remotevideo');
+                            openStreamAction();
+                            settingEventCall(videocall);
+                            videocall.connect(username, {
+                                success: function () {
+                                    console.log("Video Call connected...");
+                                    console.log("User " + username + "registered!")
+                                    $('#youok').removeClass('hide').show().html("Registered as '" + username + "'");
+                                    $('#phone').removeClass('hide').show();
+                                    $('#call').unbind('click').click(doCall);
+                                    $('#peer').focus();
+                                },
+                                error: function (error) {
+                                    console.log("Video Call could not connect: " + error);
+                                }
+                            })
+                        },
+                        error: function (error) {
+                            console.log("Could not register: " + error);
+                        }
+                    });
+                },
+                error: function (error) {
+                    console.log("Video Call could not init: " + error);
+                }
+            })
 
         });
-        function randomString(len) {
-            charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            var randomString = '';
-            for (var i = 0; i < len; i++) {
-                var randomPoz = Math.floor(Math.random() * charSet.length);
-                randomString += charSet.substring(randomPoz, randomPoz + 1);
-            }
-            return randomString;
-        }
-        function registerToken(token, callback) {
-            var pluginPermissions = ["janus.plugin.videocall"];
-            // pluginPermissions.push("janus.plugin.videocall");
-            var request = { "janus": "add_token", "token": token, plugins: pluginPermissions, "transaction": randomString(12), "admin_secret": "1231234" };
-            $.ajax({
-                type: 'POST',
-                url: "http://" + window.location.hostname + ":7088/admin",
-                cache: false,
-                contentType: "application/json",
-                data: JSON.stringify(request),
-                success: function (json) {
-                    if (json["janus"] !== "success") {
-                        console.log("Ooops: " + json["error"].code + " " + json["error"].reason);	// FIXME
-                        bootbox.alert("Could not add token successfully..\n");
-                        return;
-                    } else {
-                        //bootbox.alert("Added token successfully..\n");
-                        callback.call();
-                    }
-                },
-                error: function (XMLHttpRequest, textStatus, errorThrown) {
-                    bootbox.alert("Could not add token successfully..\n");
-                },
-                dataType: "json"
-            });
-        }
 
         function settingEventCall(videocall) {
             videocall.on('registered', function (username) {
@@ -252,20 +221,7 @@
         function doHangup() {
             videocall.hangup();
         }
-        function checkEnter(field, event) {
-            var theCode = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
-            if (theCode == 13) {
-                if (field.id == 'username')
-                    registerUsername();
-                else if (field.id == 'peer')
-                    doCall();
-                else if (field.id == 'datasend')
-                    sendData();
-                return false;
-            } else {
-                return true;
-            }
-        }
+       
     </script>
 </head>
 
@@ -288,8 +244,7 @@
                                 <div class="input-group margin-bottom-sm">
                                     <span class="input-group-addon"><i class="fa fa-phone fa-fw"></i></span>
                                     <input class="form-control" type="text" placeholder="Who should we call?"
-                                        autocomplete="off" id="peer"
-                                        onkeypress="return checkEnter(this, event);"></input>
+                                        autocomplete="off" id="peer"></input>
                                 </div>
                                 <button class="btn btn-success margin-bottom-sm" autocomplete="off"
                                     id="call">Call</button>
