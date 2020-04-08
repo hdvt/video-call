@@ -178,6 +178,9 @@ VideoCall.prototype.connect = function (account, callback) {
                                         self.plugin.hangup();
                                         self.callOnEvent('hangup', result["username"]);
                                     }
+                                    else if (event === 'stop'){
+                                        Janus.log("Result: " + result["start_time"] + ", " + result["stop_time"] + ", " + result["record_path"]); 
+                                    }
                                     else if (event === "timeout") {
                                         self.hangup();
                                         Janus.log("The call timeout. Hangup by user " + result["username"]);
@@ -209,6 +212,9 @@ VideoCall.prototype.connect = function (account, callback) {
         });
 }
 
+VideoCall.prototype.disconnect = function() {
+    this.plugin.detach();
+}
 // register user
 VideoCall.prototype.register = function (token, callback) {
     var self = this;
