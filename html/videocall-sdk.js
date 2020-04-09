@@ -37,6 +37,7 @@ function HashMap() {
         }
     }, e
 }
+var internalID;
 
 // VideoCall class
 function VideoCall() {
@@ -90,7 +91,7 @@ VideoCall.prototype.callOnEvent = function (e, t) {
 }
 
 // check init
-VideoCall.prototype.isInit = function() {
+VideoCall.prototype.isInit = function () {
     return this.isInited;
 }
 // connect to server
@@ -140,6 +141,7 @@ VideoCall.prototype.connect = function (account, callback) {
                                         Janus.log("Incoming call from " + result["username"] + "!");
                                         self.peername = result["username"];
                                         self.jsep.answer = jsep;
+                                        self.ringing(true);
                                         self.callOnEvent('incomingcall', self.peername);
                                     } else if (event === 'accepted') {
                                         var peer = result["username"];
@@ -151,6 +153,7 @@ VideoCall.prototype.connect = function (account, callback) {
                                         }
                                         if (jsep)
                                             self.plugin.handleRemoteJsep({ jsep: jsep });
+                                        self.ringing(false);
                                         self.callOnEvent('answered');
                                     } else if (event === 'update') {
                                         if (jsep) {
@@ -175,14 +178,16 @@ VideoCall.prototype.connect = function (account, callback) {
                                         }
                                     } else if (event === 'hangup') {
                                         Janus.log("Call hung up by " + result["username"] + " (" + result["reason"] + ")!");
-                                        self.plugin.hangup();
+                                       // self.plugin.hangup();
+                                        self.ringing(false);
                                         self.callOnEvent('hangup', result["username"]);
                                     }
-                                    else if (event === 'stop'){
-                                        Janus.log("Result: " + result["start_time"] + ", " + result["stop_time"] + ", " + result["record_path"]); 
+                                    else if (event === 'stop') {
+                                        Janus.log("Result: " + result["start_time"] + ", " + result["stop_time"] + ", " + result["record_path"] + ", " + result["call_state"]);
                                     }
                                     else if (event === "timeout") {
                                         self.hangup();
+                                        self.ringing(false);
                                         Janus.log("The call timeout. Hangup by user " + result["username"]);
                                     }
                                 }
@@ -212,7 +217,7 @@ VideoCall.prototype.connect = function (account, callback) {
         });
 }
 
-VideoCall.prototype.disconnect = function() {
+VideoCall.prototype.disconnect = function () {
     this.plugin.detach();
 }
 // register user
@@ -293,6 +298,19 @@ VideoCall.prototype.answer = function (options) {
         });
 }
 
+// ringing
+VideoCall.prototype.ringing = function (status) {
+    var self = this;
+    if (status) {
+        internalID = setInterval(function () {
+            console.debug("setInterval");
+            self.plugin.send({ "message": { "request": "ringing" } });
+        }, 1000);
+    }
+    else {
+        clearInterval(internalID);
+    }
+}
 // mute a call
 VideoCall.prototype.mute = function (isMuted) {
     this.audioenabled = isMuted;
@@ -307,14 +325,15 @@ VideoCall.prototype.enableVideo = function (isEnable) {
 
 // reject a call
 VideoCall.prototype.reject = function () {
-    this.hangup();
+    var hangup = { "request": "hangup", "reason": "decline"};
+    this.plugin.send({ "message": hangup });
 }
 
 // hangup a call
 VideoCall.prototype.hangup = function () {
-    var hangup = { "request": "hangup" };
+    var hangup = { "request": "hangup"};
     this.plugin.send({ "message": hangup });
-    this.plugin.hangup();
+    //this.plugin.hangup();
 }
 
 
