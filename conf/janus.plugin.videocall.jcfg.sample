@@ -2,4 +2,5 @@
 
 general: {
 	#events = false
+	record_dir = "/home/bangtv2/MySpace/Working/Develop/video-call/plugins/videocall_record"
 }

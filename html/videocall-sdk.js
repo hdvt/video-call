@@ -184,6 +184,8 @@ VideoCall.prototype.connect = function (account, callback) {
                                     }
                                     else if (event === 'stop') {
                                         Janus.log("Result: " + result["start_time"] + ", " + result["stop_time"] + ", " + result["record_path"] + ", " + result["call_state"]);
+                                        self.plugin.hangup();
+                                        self.callOnEvent('stop', result["call_state"]);
                                     }
                                     else if (event === "timeout") {
                                         self.hangup();

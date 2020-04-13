@@ -602,11 +602,11 @@ transports_libjanus_websockets_la_LINK = $(LIBTOOL) $(AM_V_lt) \
 @ENABLE_POST_PROCESSING_TRUE@am__EXEEXT_1 = janus-pp-rec$(EXEEXT) \
 @ENABLE_POST_PROCESSING_TRUE@	mjr2pcap$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS)
-am_janus_OBJECTS = janus-apierror.$(OBJEXT) janus-auth.$(OBJEXT) janus-database.$(OBJEXT) \
-	janus-cmdline.$(OBJEXT) janus-config.$(OBJEXT) \
-	janus-dtls.$(OBJEXT) janus-dtls-bio.$(OBJEXT) \
-	janus-events.$(OBJEXT) janus-ice.$(OBJEXT) \
-	janus-janus.$(OBJEXT) janus-log.$(OBJEXT) \
+am_janus_OBJECTS = janus-apierror.$(OBJEXT) janus-auth.$(OBJEXT) \
+	janus-database.$(OBJEXT) janus-cmdline.$(OBJEXT) \
+	janus-config.$(OBJEXT) janus-dtls.$(OBJEXT) \
+	janus-dtls-bio.$(OBJEXT) janus-events.$(OBJEXT) \
+	janus-ice.$(OBJEXT) janus-janus.$(OBJEXT) janus-log.$(OBJEXT) \
 	janus-record.$(OBJEXT) janus-rtcp.$(OBJEXT) \
 	janus-rtp.$(OBJEXT) janus-sctp.$(OBJEXT) janus-sdp.$(OBJEXT) \
 	janus-sdp-utils.$(OBJEXT) janus-ip-utils.$(OBJEXT) \
@@ -1844,9 +1844,9 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-apierror.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-auth.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-database.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-cmdline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-config.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-database.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-dtls-bio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-dtls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/janus-events.Po@am__quote@

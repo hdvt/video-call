@@ -1859,7 +1859,7 @@ static int janus_request_allow_token(janus_request *request, guint64 session_id,
 	const char *token_value = json_string_value(token);
 	if (add)
 	{
-		/* First of all, add the new token */ 
+		/* First of all, add the new token */
 		char *query = g_strdup_printf("INSERT INTO `user` VALUES (NULL, '%s')", token_value); // insert to database
 		if (!janus_auth_add_token(token_value))
 		{
@@ -5721,7 +5721,7 @@ gint main(int argc, char *argv[])
 			g_hash_table_insert(plugins, (gpointer)janus_plugin->get_package(), janus_plugin);
 			if (!g_strcmp0(janus_plugin->get_package(), "janus.plugin.videocall") && janus_auth_is_enabled())
 			{
-				JANUS_LOG(LOG_ERR, "Import token for plugin: %s\n", janus_plugin->get_package());
+				JANUS_LOG(LOG_INFO, "Import token for plugin: %s\n", janus_plugin->get_package());
 				// import tokens from the database
 				MYSQL_RES *res = mysql_handler_get("SELECT `token` FROM `user`");
 				if (res)
