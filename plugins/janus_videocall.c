@@ -120,7 +120,7 @@ typedef enum janus_call_state
 	CALL_RINGING,
 	CALL_ACCEPTED,
 	CALL_DECLINE,
-	CALL_NOT_ANSWER,
+	CALL_MISSED,
 	CALL_STARTED,
 	CALL_TIMEOUT,
 	CALL_ENDED
@@ -1664,7 +1664,7 @@ static void *janus_videocall_handler(void *data)
 				}
 				curr_handle = curr_handle->next;
 			}
-			
+
 			/* Send an ack back */
 			result = json_object();
 			json_object_set_new(result, "event", json_string("accepted"));
@@ -1704,7 +1704,7 @@ static void *janus_videocall_handler(void *data)
 					gint64 now = janus_get_real_time();
 					if ((now - call->start_ringtime) >= 60 * G_USEC_PER_SEC) // timeout
 					{
-						call->state = CALL_NOT_ANSWER;
+						call->state = CALL_MISSED;
 						json_t *event = json_object();
 						json_object_set_new(event, "videocall", json_string("event"));
 						json_t *info = json_object();
@@ -1934,6 +1934,7 @@ static void *janus_videocall_handler(void *data)
 					g_snprintf(error_cause, 512, "The call has started");
 					goto error;
 				}
+				session->handle = msg->handle;
 				session->call->state = CALL_DECLINE;
 				json_t *event = json_object();
 				json_object_set_new(event, "videocall", json_string("event"));
@@ -1942,7 +1943,18 @@ static void *janus_videocall_handler(void *data)
 				json_object_set_new(info, "call_state", json_integer(session->call->state));
 				json_object_set_new(event, "result", info);
 				int ret = gateway->push_event(session->peer->handle, &janus_videocall_plugin, NULL, event, NULL);
-				JANUS_LOG(LOG_ERR, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
+				JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
+				GList *curr_handle = session->handles;
+				while (curr_handle)
+				{
+					if (curr_handle != session->handle)
+					{
+						janus_plugin_session *handle = (janus_plugin_session *)curr_handle->data;
+						int ret = gateway->push_event(handle, &janus_videocall_plugin, NULL, event, NULL);
+						JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
+					}
+					curr_handle = curr_handle->next;
+				}
 				json_decref(event);
 				janus_mutex_unlock(&session->call->mutex);
 			}
