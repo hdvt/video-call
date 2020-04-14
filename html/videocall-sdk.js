@@ -178,14 +178,16 @@ VideoCall.prototype.connect = function (account, callback) {
                                         }
                                     } else if (event === 'hangup') {
                                         Janus.log("Call hung up by " + result["username"] + " (" + result["reason"] + ")!");
-                                       // self.plugin.hangup();
+                                        self.plugin.hangup();
                                         self.ringing(false);
                                         self.callOnEvent('hangup', result["username"]);
                                     }
                                     else if (event === 'stop') {
                                         Janus.log("Result: " + result["start_time"] + ", " + result["stop_time"] + ", " + result["record_path"] + ", " + result["call_state"]);
-                                        self.plugin.hangup();
+                                        self.ringing(false);
+                                        //self.plugin.hangup();
                                         self.callOnEvent('stop', result["call_state"]);
+
                                     }
                                     else if (event === "timeout") {
                                         self.hangup();
@@ -327,7 +329,7 @@ VideoCall.prototype.enableVideo = function (isEnable) {
 
 // reject a call
 VideoCall.prototype.reject = function () {
-    var hangup = { "request": "hangup", "reason": "decline"};
+    var hangup = { "request": "reject"};
     this.plugin.send({ "message": hangup });
 }
 

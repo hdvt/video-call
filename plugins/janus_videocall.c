@@ -119,7 +119,7 @@ typedef enum janus_call_state
 	CALL_BUSY,
 	CALL_RINGING,
 	CALL_ACCEPTED,
-	CALL_DECLINE,
+	CALL_REJECT,
 	CALL_MISSED,
 	CALL_STARTED,
 	CALL_TIMEOUT,
@@ -1082,28 +1082,7 @@ void janus_videocall_hangup_media(janus_plugin_session *handle)
 	session->peer = NULL;
 
 	if (peer)
-	{
-		/* Send event to our peer too */
-		json_t *call = json_object();
-		json_object_set_new(call, "videocall", json_string("event"));
-		json_t *calling = json_object();
-		json_object_set_new(calling, "event", json_string("hangup"));
-		json_object_set_new(calling, "username", json_string(session->username));
-		json_object_set_new(calling, "reason", json_string("Remote WebRTC hangup"));
-		json_object_set_new(call, "result", calling);
 		gateway->close_pc(peer->handle);
-		int ret = gateway->push_event(peer->handle, &janus_videocall_plugin, NULL, call, NULL);
-		JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
-		json_decref(call);
-		/* Also notify event handlers */
-		if (notify_events && gateway->events_is_enabled())
-		{
-			json_t *info = json_object();
-			json_object_set_new(info, "event", json_string("hangup"));
-			json_object_set_new(info, "reason", json_string("Remote WebRTC hangup"));
-			gateway->notify_event(&janus_videocall_plugin, peer->handle, info);
-		}
-	}
 
 	/* Reset controls */
 	session->has_audio = FALSE;
@@ -1387,18 +1366,18 @@ static void *janus_videocall_handler(void *data)
 				JANUS_LOG(LOG_VERB, "  >> Pushing event: %d (%s)\n", ret, janus_get_api_error(ret));
 				json_decref(result);
 
-				result = json_object();
-				json_object_set_new(result, "event", json_string("hangup"));
-				json_object_set_new(result, "username", json_string(session->username));
-				json_object_set_new(result, "reason", json_string("User busy"));
-				/* Also notify event handlers */
-				if (notify_events && gateway->events_is_enabled())
-				{
-					json_t *info = json_object();
-					json_object_set_new(info, "event", json_string("hangup"));
-					json_object_set_new(info, "reason", json_string("User busy"));
-					gateway->notify_event(&janus_videocall_plugin, msg->handle, info);
-				}
+				// result = json_object();
+				// json_object_set_new(result, "event", json_string("hangup"));
+				// json_object_set_new(result, "username", json_string(session->username));
+				// json_object_set_new(result, "reason", json_string("User busy"));
+				// /* Also notify event handlers */
+				// if (notify_events && gateway->events_is_enabled())
+				// {
+				// 	json_t *info = json_object();
+				// 	json_object_set_new(info, "event", json_string("hangup"));
+				// 	json_object_set_new(info, "reason", json_string("User busy"));
+				// 	gateway->notify_event(&janus_videocall_plugin, msg->handle, info);
+				// }
 				/* Hangup the call attempt of the user */
 				gateway->close_pc(msg->handle);
 			}
@@ -1532,6 +1511,13 @@ static void *janus_videocall_handler(void *data)
 				JANUS_LOG(LOG_ERR, "No incoming call to accept\n");
 				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
 				g_snprintf(error_cause, 512, "No incoming call to accept");
+				goto error;
+			}
+			if (session->call == NULL)
+			{
+				JANUS_LOG(LOG_ERR, "The call not exits...\n");
+				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
+				g_snprintf(error_cause, 512, "The call not exits");
 				goto error;
 			}
 			janus_mutex_lock(&session->call->mutex);
@@ -1689,6 +1675,80 @@ static void *janus_videocall_handler(void *data)
 			}
 			/* We don't need this reference anymore, it was already increased by the peer calling us */
 			janus_refcount_decrease(&peer->ref);
+			janus_mutex_unlock(&session->mutex);
+		}
+		else if (!strcasecmp(request_text, "reject"))
+		{
+			/* Reject a call from another peer */
+			janus_mutex_lock(&session->mutex);
+			janus_mutex_lock(&session->call->mutex);
+			janus_user_session *peer = session->peer;
+			if (peer == NULL || !g_atomic_int_get(&session->incall) || !g_atomic_int_get(&peer->incall))
+			{
+				janus_mutex_unlock(&session->call->mutex);
+				janus_mutex_unlock(&session->mutex);
+				JANUS_LOG(LOG_ERR, "No incoming call to reject\n");
+				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
+				g_snprintf(error_cause, 512, "No incoming call to reject");
+				goto error;
+			}
+			if (session->call == NULL)
+			{
+				janus_mutex_unlock(&session->call->mutex);
+				janus_mutex_unlock(&session->mutex);
+				JANUS_LOG(LOG_ERR, "The call not exits...\n");
+				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
+				g_snprintf(error_cause, 512, "The call not exits");
+				goto error;
+			}
+			if (session->call->state == CALL_ACCEPTED)
+			{
+				janus_mutex_unlock(&session->call->mutex);
+				janus_mutex_unlock(&session->mutex);
+				JANUS_LOG(LOG_ERR, "The call has started...\n");
+				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
+				g_snprintf(error_cause, 512, "The call has started");
+				goto error;
+			}
+
+			JANUS_LOG(LOG_VERB, "%s is reject the call with %s\n", session->username, peer->username);
+			/* Check if we still need to remove any reference */
+			if (peer && g_atomic_int_compare_and_exchange(&peer->incall, 1, 0))
+			{
+				janus_refcount_decrease(&session->ref);
+			}
+			if (g_atomic_int_compare_and_exchange(&session->incall, 1, 0) && peer)
+			{
+				janus_refcount_decrease(&peer->ref);
+			}
+			session->handle = msg->handle;
+			session->call->state = CALL_REJECT;
+
+			// notify stop event to handlers
+			json_t *event = json_object();
+			json_object_set_new(event, "videocall", json_string("event"));
+			json_t *info = json_object();
+			json_object_set_new(info, "event", json_string("stop"));
+			json_object_set_new(info, "call_state", json_integer(session->call->state));
+			json_object_set_new(event, "result", info);
+			int ret = gateway->push_event(session->peer->handle, &janus_videocall_plugin, NULL, event, NULL);
+			JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
+			GList *curr_handle = session->handles;
+			while (curr_handle)
+			{
+				if (curr_handle != session->handle)
+				{
+					janus_plugin_session *handle = (janus_plugin_session *)curr_handle->data;
+					int ret = gateway->push_event(handle, &janus_videocall_plugin, NULL, event, NULL);
+					JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
+				}
+				curr_handle = curr_handle->next;
+			}
+			json_decref(event);
+
+			// close pc
+			gateway->close_pc(session->handle);
+			janus_mutex_unlock(&session->call->mutex);
 			janus_mutex_unlock(&session->mutex);
 		}
 		else if (!strcasecmp(request_text, "ringing"))
@@ -1882,23 +1942,30 @@ static void *janus_videocall_handler(void *data)
 		}
 		else if (!strcasecmp(request_text, "hangup"))
 		{
-			json_t *hangup = json_object_get(root, "reason");
-			if (hangup && !json_is_string(hangup))
-			{
-				JANUS_LOG(LOG_WARN, "Invalid element (hangup should be a string), ignoring\n");
-				hangup = NULL;
-			}
-			const char *hangup_text = hangup ? json_string_value(hangup) : "We did the hangup";
-			/* Hangup an ongoing call or reject an incoming one */
+			/* Reject a call from another peer */
+			janus_mutex_lock(&session->mutex);
+			janus_mutex_lock(&session->call->mutex);
 			janus_user_session *peer = session->peer;
-			if (peer == NULL)
+			if (peer == NULL || !g_atomic_int_get(&session->incall) || !g_atomic_int_get(&peer->incall) || session->call == NULL)
 			{
-				JANUS_LOG(LOG_WARN, "No call to hangup\n");
+				janus_mutex_unlock(&session->call->mutex);
+				janus_mutex_unlock(&session->mutex);
+				JANUS_LOG(LOG_ERR, "No call to hangup\n");
+				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
+				g_snprintf(error_cause, 512, "No call to hangup");
+				goto error;
 			}
-			else
+			if (session->call->state != CALL_STARTED)
 			{
-				JANUS_LOG(LOG_VERB, "%s is hanging up the call with %s (%s)\n", session->username, peer->username, hangup_text);
+				janus_mutex_unlock(&session->call->mutex);
+				janus_mutex_unlock(&session->mutex);
+				JANUS_LOG(LOG_ERR, "The call hasn't started...\n");
+				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
+				g_snprintf(error_cause, 512, "The call hasn't started");
+				goto error;
 			}
+
+			JANUS_LOG(LOG_VERB, "%s is hanging up the call with %s (%s)\n", session->username, peer->username);
 			/* Check if we still need to remove any reference */
 			if (peer && g_atomic_int_compare_and_exchange(&peer->incall, 1, 0))
 			{
@@ -1908,91 +1975,9 @@ static void *janus_videocall_handler(void *data)
 			{
 				janus_refcount_decrease(&peer->ref);
 			}
-			/* Notify the success as an hangup message */
-			// result = json_object();
-			// json_object_set_new(result, "event", json_string("hangup"));
-			// json_object_set_new(result, "username", json_string(session->username));
-			// json_object_set_new(result, "reason", json_string(hangup_text));
-			// json_object_set_new(result, "reason", json_string("Explicit hangup"));
-
-			if (!strcasecmp(hangup_text, "decline"))
-			{
-				janus_mutex_lock(&session->call->mutex);
-				if (session->call == NULL)
-				{
-					janus_mutex_unlock(&session->call->mutex);
-					JANUS_LOG(LOG_ERR, "The call not exits...\n");
-					error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
-					g_snprintf(error_cause, 512, "The call not exits");
-					goto error;
-				}
-				if (session->call->state == CALL_ACCEPTED)
-				{
-					janus_mutex_unlock(&session->call->mutex);
-					JANUS_LOG(LOG_ERR, "The call has started...\n");
-					error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
-					g_snprintf(error_cause, 512, "The call has started");
-					goto error;
-				}
-				session->handle = msg->handle;
-				session->call->state = CALL_DECLINE;
-				json_t *event = json_object();
-				json_object_set_new(event, "videocall", json_string("event"));
-				json_t *info = json_object();
-				json_object_set_new(info, "event", json_string("stop"));
-				json_object_set_new(info, "call_state", json_integer(session->call->state));
-				json_object_set_new(event, "result", info);
-				int ret = gateway->push_event(session->peer->handle, &janus_videocall_plugin, NULL, event, NULL);
-				JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
-				GList *curr_handle = session->handles;
-				while (curr_handle)
-				{
-					if (curr_handle != session->handle)
-					{
-						janus_plugin_session *handle = (janus_plugin_session *)curr_handle->data;
-						int ret = gateway->push_event(handle, &janus_videocall_plugin, NULL, event, NULL);
-						JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
-					}
-					curr_handle = curr_handle->next;
-				}
-				json_decref(event);
-				janus_mutex_unlock(&session->call->mutex);
-			}
-			/* Also notify event handlers */
-			if (notify_events && gateway->events_is_enabled())
-			{
-				json_t *info = json_object();
-				json_object_set_new(info, "event", json_string("hangup"));
-				json_object_set_new(info, "reason", json_string("Explicit hangup"));
-				gateway->notify_event(&janus_videocall_plugin, session->handle, info);
-			}
-			/* Hangup the call on the user, if it's still up */
 			gateway->close_pc(session->handle);
-			if (peer != NULL)
-			{
-				/* Send event to our peer too */
-				// json_t *call = json_object();
-				// json_object_set_new(call, "videocall", json_string("event"));
-				// json_t *calling = json_object();
-				// json_object_set_new(calling, "event", json_string("hangup"));
-				// json_object_set_new(calling, "username", json_string(session->username));
-				// json_object_set_new(calling, "reason", json_string(hangup_text));
-				// json_object_set_new(call, "result", calling);
-				// gateway->close_pc(peer->handle);
-				// int ret = gateway->push_event(peer->handle, &janus_videocall_plugin, NULL, call, NULL);
-				// JANUS_LOG(LOG_VERB, "  >> Pushing event to peer: %d (%s)\n", ret, janus_get_api_error(ret));
-				// json_decref(call);
-				/* Also notify event handlers */
-				if (notify_events && gateway->events_is_enabled())
-				{
-					json_t *info = json_object();
-					json_object_set_new(info, "event", json_string("hangup"));
-					json_object_set_new(info, "reason", json_string("Remote hangup"));
-					gateway->notify_event(&janus_videocall_plugin, peer->handle, info);
-				}
-				/* Hangup the call on the peer, if it's still up */
-				//gateway->close_pc(peer->handle);
-			}
+			janus_mutex_unlock(&session->call->mutex);
+			janus_mutex_unlock(&session->mutex);
 		}
 		else
 		{
