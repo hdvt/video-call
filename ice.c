@@ -94,6 +94,13 @@ gboolean janus_ice_is_full_trickle_enabled(void)
 	return janus_full_trickle_enabled;
 }
 
+/* mDNS resolution support */
+static gboolean janus_mdns_enabled;
+gboolean janus_ice_is_mdns_enabled(void)
+{
+	return janus_mdns_enabled;
+}
+
 /* IPv6 support (still mostly WIP) */
 static gboolean janus_ipv6_enabled;
 gboolean janus_ice_is_ipv6_enabled(void)
@@ -884,11 +891,13 @@ void janus_ice_trickle_destroy(janus_ice_trickle *trickle)
 }
 
 /* libnice initialization */
-void janus_ice_init(gboolean ice_lite, gboolean ice_tcp, gboolean full_trickle, gboolean ipv6, uint16_t rtp_min_port, uint16_t rtp_max_port)
+void janus_ice_init(gboolean ice_lite, gboolean ice_tcp, gboolean full_trickle, gboolean ignore_mdns,
+					gboolean ipv6, uint16_t rtp_min_port, uint16_t rtp_max_port)
 {
 	janus_ice_lite_enabled = ice_lite;
 	janus_ice_tcp_enabled = ice_tcp;
 	janus_full_trickle_enabled = full_trickle;
+	janus_mdns_enabled = !ignore_mdns;
 	janus_ipv6_enabled = ipv6;
 	JANUS_LOG(LOG_INFO, "Initializing ICE stuff (%s mode, ICE-TCP candidates %s, %s-trickle, IPv6 support %s)\n",
 			  janus_ice_lite_enabled ? "Lite" : "Full",
@@ -928,6 +937,8 @@ void janus_ice_init(gboolean ice_lite, gboolean ice_tcp, gboolean full_trickle, 
 		JANUS_LOG(LOG_INFO, "ICE port range: %" SCNu16 "-%" SCNu16 "\n", rtp_range_min, rtp_range_max);
 #endif
 	}
+	if (!janus_mdns_enabled)
+		JANUS_LOG(LOG_WARN, "mDNS resolution disabled, .local candidates will be ignored\n");
 
 	/* We keep track of plugin sessions to avoid problems */
 	plugin_sessions = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)janus_plugin_session_dereference);

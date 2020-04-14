@@ -30,7 +30,6 @@
 #include "refcount.h"
 #include "plugins/plugin.h"
 
-
 /*! \brief ICE stuff initialization
  * @param[in] ice_lite Whether the ICE Lite mode should be enabled or not
  * @param[in] ice_tcp Whether ICE-TCP support should be enabled or not (only libnice >= 0.1.8, currently broken)
@@ -38,7 +37,8 @@
  * @param[in] ipv6 Whether IPv6 candidates must be negotiated or not
  * @param[in] rtp_min_port Minimum port to use for RTP/RTCP, if a range is to be used
  * @param[in] rtp_max_port Maximum port to use for RTP/RTCP, if a range is to be used */
-void janus_ice_init(gboolean ice_lite, gboolean ice_tcp, gboolean full_trickle, gboolean ipv6, uint16_t rtp_min_port, uint16_t rtp_max_port);
+void janus_ice_init(gboolean ice_lite, gboolean ice_tcp, gboolean full_trickle, gboolean ignore_mdns,
+					gboolean ipv6, uint16_t rtp_min_port, uint16_t rtp_max_port);
 /*! \brief ICE stuff de-initialization */
 void janus_ice_deinit(void);
 /*! \brief Method to check whether a STUN server is reachable
@@ -119,6 +119,9 @@ gboolean janus_ice_is_ice_tcp_enabled(void);
 /*! \brief Method to check whether full-trickle support is enabled or not
  * @returns true if full-trickle support is enabled, false otherwise */
 gboolean janus_ice_is_full_trickle_enabled(void);
+/*! \brief Method to check whether mDNS resolution is enabled or not
+ * @returns true if mDNS resolution is enabled, false otherwise */
+gboolean janus_ice_is_mdns_enabled(void);
 /*! \brief Method to check whether IPv6 candidates are enabled/supported or not (still WIP)
  * @returns true if IPv6 candidates are enabled/supported, false otherwise */
 gboolean janus_ice_is_ipv6_enabled(void);
@@ -165,12 +168,10 @@ void janus_enable_opaqueid_in_api(void);
  * @returns TRUE if they need to be present, FALSE otherwise */
 gboolean janus_is_opaqueid_in_api_enabled(void);
 
-
 /*! \brief Helper method to get a string representation of a libnice ICE state
  * @param[in] state The libnice ICE state
  * @returns A string representation of the libnice ICE state */
 const gchar *janus_get_ice_state_name(gint state);
-
 
 /*! \brief Janus ICE handle/session */
 typedef struct janus_ice_handle janus_ice_handle;
@@ -181,31 +182,31 @@ typedef struct janus_ice_component janus_ice_component;
 /*! \brief Helper to handle pending trickle candidates (e.g., when we're still waiting for an offer) */
 typedef struct janus_ice_trickle janus_ice_trickle;
 
-#define JANUS_ICE_HANDLE_WEBRTC_PROCESSING_OFFER	(1 << 0)
-#define JANUS_ICE_HANDLE_WEBRTC_START				(1 << 1)
-#define JANUS_ICE_HANDLE_WEBRTC_READY				(1 << 2)
-#define JANUS_ICE_HANDLE_WEBRTC_STOP				(1 << 3)
-#define JANUS_ICE_HANDLE_WEBRTC_ALERT				(1 << 4)
-#define JANUS_ICE_HANDLE_WEBRTC_NEGOTIATED			(1 << 5)
-#define JANUS_ICE_HANDLE_WEBRTC_TRICKLE				(1 << 7)
-#define JANUS_ICE_HANDLE_WEBRTC_ALL_TRICKLES		(1 << 8)
-#define JANUS_ICE_HANDLE_WEBRTC_TRICKLE_SYNCED		(1 << 9)
-#define JANUS_ICE_HANDLE_WEBRTC_DATA_CHANNELS		(1 << 10)
-#define JANUS_ICE_HANDLE_WEBRTC_CLEANING			(1 << 11)
-#define JANUS_ICE_HANDLE_WEBRTC_HAS_AUDIO			(1 << 12)
-#define JANUS_ICE_HANDLE_WEBRTC_HAS_VIDEO			(1 << 13)
-#define JANUS_ICE_HANDLE_WEBRTC_GOT_OFFER			(1 << 14)
-#define JANUS_ICE_HANDLE_WEBRTC_GOT_ANSWER			(1 << 15)
-#define JANUS_ICE_HANDLE_WEBRTC_HAS_AGENT			(1 << 16)
-#define JANUS_ICE_HANDLE_WEBRTC_ICE_RESTART			(1 << 17)
-#define JANUS_ICE_HANDLE_WEBRTC_RESEND_TRICKLES		(1 << 18)
-#define JANUS_ICE_HANDLE_WEBRTC_RFC4588_RTX			(1 << 19)
-#define JANUS_ICE_HANDLE_WEBRTC_NEW_DATACHAN_SDP	(1 << 20)
-
+#define JANUS_ICE_HANDLE_WEBRTC_PROCESSING_OFFER (1 << 0)
+#define JANUS_ICE_HANDLE_WEBRTC_START (1 << 1)
+#define JANUS_ICE_HANDLE_WEBRTC_READY (1 << 2)
+#define JANUS_ICE_HANDLE_WEBRTC_STOP (1 << 3)
+#define JANUS_ICE_HANDLE_WEBRTC_ALERT (1 << 4)
+#define JANUS_ICE_HANDLE_WEBRTC_NEGOTIATED (1 << 5)
+#define JANUS_ICE_HANDLE_WEBRTC_TRICKLE (1 << 7)
+#define JANUS_ICE_HANDLE_WEBRTC_ALL_TRICKLES (1 << 8)
+#define JANUS_ICE_HANDLE_WEBRTC_TRICKLE_SYNCED (1 << 9)
+#define JANUS_ICE_HANDLE_WEBRTC_DATA_CHANNELS (1 << 10)
+#define JANUS_ICE_HANDLE_WEBRTC_CLEANING (1 << 11)
+#define JANUS_ICE_HANDLE_WEBRTC_HAS_AUDIO (1 << 12)
+#define JANUS_ICE_HANDLE_WEBRTC_HAS_VIDEO (1 << 13)
+#define JANUS_ICE_HANDLE_WEBRTC_GOT_OFFER (1 << 14)
+#define JANUS_ICE_HANDLE_WEBRTC_GOT_ANSWER (1 << 15)
+#define JANUS_ICE_HANDLE_WEBRTC_HAS_AGENT (1 << 16)
+#define JANUS_ICE_HANDLE_WEBRTC_ICE_RESTART (1 << 17)
+#define JANUS_ICE_HANDLE_WEBRTC_RESEND_TRICKLES (1 << 18)
+#define JANUS_ICE_HANDLE_WEBRTC_RFC4588_RTX (1 << 19)
+#define JANUS_ICE_HANDLE_WEBRTC_NEW_DATACHAN_SDP (1 << 20)
 
 /*! \brief Janus media statistics
  * \note To improve with more stuff */
-typedef struct janus_ice_stats_info {
+typedef struct janus_ice_stats_info
+{
 	/*! \brief Packets sent or received */
 	guint32 packets;
 	/*! \brief Bytes sent or received */
@@ -222,7 +223,8 @@ typedef struct janus_ice_stats_info {
 
 /*! \brief Janus media statistics container
  * \note To improve with more stuff */
-typedef struct janus_ice_stats {
+typedef struct janus_ice_stats
+{
 	/*! \brief Audio info */
 	janus_ice_stats_info audio;
 	/*! \brief Video info (considering we may be simulcasting) */
@@ -240,15 +242,14 @@ typedef struct janus_ice_stats {
  * @param reason A description of why this happened */
 void janus_ice_notify_hangup(janus_ice_handle *handle, const char *reason);
 
-
 /*! \brief Quick helper method to check if a plugin session associated with a Janus handle is still valid
  * @param plugin_session The janus_plugin_session instance to validate
  * @returns true if the plugin session is valid, false otherwise */
 gboolean janus_plugin_session_is_alive(janus_plugin_session *plugin_session);
 
-
 /*! \brief A helper struct for determining when to send NACKs */
-typedef struct janus_seq_info {
+typedef struct janus_seq_info
+{
 	gint64 ts;
 	guint16 seq;
 	guint16 state;
@@ -256,16 +257,17 @@ typedef struct janus_seq_info {
 	struct janus_seq_info *prev;
 } janus_seq_info;
 void janus_seq_list_free(janus_seq_info **head);
-enum {
+enum
+{
 	SEQ_MISSING,
 	SEQ_NACKED,
 	SEQ_GIVEUP,
 	SEQ_RECVED
 };
 
-
 /*! \brief Janus ICE handle */
-struct janus_ice_handle {
+struct janus_ice_handle
+{
 	/*! \brief Opaque pointer to the core/peer session */
 	void *session;
 	/*! \brief Handle identifier, guaranteed to be non-zero */
@@ -341,13 +343,14 @@ struct janus_ice_handle {
 };
 
 /*! \brief Janus ICE stream */
-struct janus_ice_stream {
+struct janus_ice_stream
+{
 	/*! \brief Janus ICE handle this stream belongs to */
 	janus_ice_handle *handle;
 	/*! \brief libnice ICE stream ID */
 	guint stream_id;
 	/*! \brief Whether this stream is ready to be used */
-	gint cdone:1;
+	gint cdone : 1;
 	/*! \brief Audio SSRC of the server for this stream */
 	guint32 audio_ssrc;
 	/*! \brief Video SSRC of the server for this stream */
@@ -379,7 +382,7 @@ struct janus_ice_stream {
 	/*! \brief Codecs used by this stream */
 	char *audio_codec, *video_codec;
 	/*! \brief Pointer to function to check if a packet is a keyframe (depends on negotiated codec) */
-	gboolean (* video_is_keyframe)(const char* buffer, int len);
+	gboolean (*video_is_keyframe)(const char *buffer, int len);
 	/*! \brief Media direction */
 	gboolean audio_send, audio_recv, video_send, video_recv;
 	/*! \brief RTCP context for the audio stream */
@@ -454,7 +457,8 @@ struct janus_ice_stream {
 
 #define LAST_SEQS_MAX_LEN 160
 /*! \brief Janus ICE component */
-struct janus_ice_component {
+struct janus_ice_component
+{
 	/*! \brief Janus ICE stream this component belongs to */
 	janus_ice_stream *stream;
 	/*! \brief libnice ICE stream ID */
@@ -520,7 +524,8 @@ struct janus_ice_component {
 };
 
 /*! \brief Helper to handle pending trickle candidates (e.g., when we're still waiting for an offer) */
-struct janus_ice_trickle {
+struct janus_ice_trickle
+{
 	/*! \brief Janus ICE handle this trickle candidate belongs to */
 	janus_ice_handle *handle;
 	/*! \brief Monotonic time of when this trickle candidate has been received */
@@ -549,7 +554,6 @@ gint janus_ice_trickle_parse(janus_ice_handle *handle, json_t *candidate, const 
  * @param[in] trickle The janus_ice_trickle instance to destroy */
 void janus_ice_trickle_destroy(janus_ice_trickle *trickle);
 ///@}
-
 
 /** @name Janus ICE handle methods
  */
@@ -582,7 +586,6 @@ void janus_ice_stream_destroy(janus_ice_stream *stream);
  * @param[in] component The Janus ICE component instance to free */
 void janus_ice_component_destroy(janus_ice_component *component);
 ///@}
-
 
 /** @name Janus ICE media relaying callbacks
  */
@@ -620,7 +623,6 @@ void janus_ice_incoming_data(janus_ice_handle *handle, char *label, gboolean tex
 void janus_ice_relay_sctp(janus_ice_handle *handle, char *buffer, int length);
 ///@}
 
-
 /** @name Janus ICE handle helpers
  */
 ///@{
@@ -656,7 +658,6 @@ void janus_ice_restart(janus_ice_handle *handle);
  * @param[in] handle The Janus ICE handle this method refers to */
 void janus_ice_resend_trickles(janus_ice_handle *handle);
 ///@}
-
 
 /*! \brief Method to configure the static event loops mechanism at startup
  * @note Check the \c event_loops property in the \c janus.jcfg configuration
