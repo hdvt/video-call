@@ -100,11 +100,26 @@ VideoCall.prototype.connect = function (account, callback) {
     self.janus = new Janus(
         {
             server: this.media_server,
-            iceServers : [{url:'stun:stun.l.google.com:19302'}],
-            iceServers: [{ urls: "turn:bangtv.ml:3478?transport=tcp", username: "bangtran", credential: "1231234" }],
-            iceServers: [{ urls: "turn:bangtv.ml:3478?transport=udp", username: "bangtran", credential: "1231234" }],
-            iceServers: [{ urls: "turn:bangtv.ml:443?transport=tcp", username: "bangtran", credential: "1231234"}],
-            iceServers: [{ urls: "turn:bangtv.ml:80?transport=tcp", username: "bangtran", credential: "1231234"}],
+            iceServers: [
+                {
+                    'urls': 'stun:stun.l.google.com:19302'
+                },
+                {
+                    'urls': 'turn:bangtv.ml:3478?transport=tcp',
+                    'credential': '1231234',
+                    'username': 'bangtran'
+                },
+                {
+                    'urls': 'turn:bangtv.ml:3478?transport=udp',
+                    'credential': '1231234',
+                    'username': 'bangtran'
+                },
+                {
+                    'urls': 'turn:bangtv.ml:443?transport=tcp',
+                    'credential': '1231234',
+                    'username': 'bangtran'
+                }
+            ],
             token: account,
             success: function () {
                 self.isConnected = true;
