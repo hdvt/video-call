@@ -1681,11 +1681,9 @@ static void *janus_videocall_handler(void *data)
 		{
 			/* Reject a call from another peer */
 			janus_mutex_lock(&session->mutex);
-			janus_mutex_lock(&session->call->mutex);
 			janus_user_session *peer = session->peer;
 			if (peer == NULL || !g_atomic_int_get(&session->incall) || !g_atomic_int_get(&peer->incall))
 			{
-				janus_mutex_unlock(&session->call->mutex);
 				janus_mutex_unlock(&session->mutex);
 				JANUS_LOG(LOG_ERR, "No incoming call to reject\n");
 				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
@@ -1694,13 +1692,13 @@ static void *janus_videocall_handler(void *data)
 			}
 			if (session->call == NULL)
 			{
-				janus_mutex_unlock(&session->call->mutex);
 				janus_mutex_unlock(&session->mutex);
 				JANUS_LOG(LOG_ERR, "The call not exits...\n");
 				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
 				g_snprintf(error_cause, 512, "The call not exits");
 				goto error;
 			}
+			janus_mutex_lock(&session->call->mutex);
 			if (session->call->state == CALL_ACCEPTED)
 			{
 				janus_mutex_unlock(&session->call->mutex);
@@ -1944,17 +1942,16 @@ static void *janus_videocall_handler(void *data)
 		{
 			/* Reject a call from another peer */
 			janus_mutex_lock(&session->mutex);
-			janus_mutex_lock(&session->call->mutex);
 			janus_user_session *peer = session->peer;
-			if (peer == NULL || !g_atomic_int_get(&session->incall) || !g_atomic_int_get(&peer->incall) || session->call == NULL)
+			if (peer == NULL || session->call == NULL)
 			{
-				janus_mutex_unlock(&session->call->mutex);
 				janus_mutex_unlock(&session->mutex);
 				JANUS_LOG(LOG_ERR, "No call to hangup\n");
 				error_code = JANUS_VIDEOCALL_ERROR_NO_CALL;
 				g_snprintf(error_cause, 512, "No call to hangup");
 				goto error;
 			}
+			janus_mutex_lock(&session->call->mutex);
 			if (session->call->state != CALL_STARTED)
 			{
 				janus_mutex_unlock(&session->call->mutex);
