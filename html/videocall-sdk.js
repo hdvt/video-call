@@ -100,6 +100,10 @@ VideoCall.prototype.connect = function (account, callback) {
     self.janus = new Janus(
         {
             server: this.media_server,
+            iceServers: [{ urls: "turn:bangtv.ml:3478?transport=tcp", username: "bangtran", credential: "1231234" }],
+            iceServers: [{ urls: "turn:bangtv.ml:3478?transport=udp", username: "bangtran", credential: "1231234" }],
+            iceServers: [{ urls: "turn:bangtv.ml:443?transport=tcp", username: "bangtran", credential: "1231234"}],
+            iceServers: [{ urls: "turn:bangtv.ml:80?transport=tcp", username: "bangtran", credential: "1231234"}],
             token: account,
             success: function () {
                 self.isConnected = true;
@@ -329,13 +333,13 @@ VideoCall.prototype.enableVideo = function (isEnable) {
 
 // reject a call
 VideoCall.prototype.reject = function () {
-    var hangup = { "request": "reject"};
+    var hangup = { "request": "reject" };
     this.plugin.send({ "message": hangup });
 }
 
 // hangup a call
 VideoCall.prototype.hangup = function () {
-    var hangup = { "request": "hangup"};
+    var hangup = { "request": "hangup" };
     this.plugin.send({ "message": hangup });
     //this.plugin.hangup();
 }
