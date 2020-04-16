@@ -88,18 +88,13 @@
 					.removeClass("btn-success").addClass("btn-danger")
 					.unbind('click').click(doHangup);
 			});
-			videocall.on('hangup', function (username) {
-				console.log("Hangup by user: " + username);
-				bootbox.hideAll();
+			videocall.on('stop', function (callstate) {		
+				videoInput.srcObject = null;	
+				videoOutput.srcObject = null;
 				$('#peer').removeAttr('disabled').val('');
 				$('#call').removeAttr('disabled').html('Call')
 					.removeClass("btn-danger").addClass("btn-success")
 					.unbind('click').click(doCall);
-				videoInput.pause();
-				videoOutput.srcObject = null;
-			});
-			videocall.on('stop', function (callstate) {			
-				videoOutput.srcObject = null;
 				bootbox.hideAll();
 			});
 			videocall.on('addlocalstream', function (stream) {
