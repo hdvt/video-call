@@ -519,7 +519,6 @@ void janus_videocall_destroy_session(janus_plugin_session *handle, int *error)
 		{
 			if (g_list_find(session->handles, handle))
 			{
-				JANUS_LOG(LOG_VERB, "g_list_remove: session->handles\n");
 				session->handles = g_list_remove(session->handles, handle);
 				janus_refcount_decrease(&handle->ref);
 			}

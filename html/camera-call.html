@@ -32,11 +32,10 @@
             videocall.init({
                 success: function () {
                     username = Math.random().toString(36).substring(7);
-                    videocall.register(username, {
+                    videoInput = document.getElementById('myvideo');
+                    videoOutput = document.getElementById('remotevideo');
+                    register(username, {
                         success: function () {
-                            videoInput = document.getElementById('myvideo');
-                            videoOutput = document.getElementById('remotevideo');
-                            openStreamAction();
                             settingEventCall(videocall);
                             videocall.connect(username, {
                                 success: function () {
@@ -50,18 +49,17 @@
                                 error: function (error) {
                                     console.log("Video Call could not connect: " + error);
                                 }
-                            })
+                            });
                         },
-                        error: function (error) {
-                            console.log("Could not register: " + error);
+                        error: function () {
+                            console.debug("Could not register user: " + error);
                         }
                     });
                 },
                 error: function (error) {
                     console.log("Video Call could not init: " + error);
                 }
-            })
-
+            });
         });
 
         function settingEventCall(videocall) {
@@ -83,6 +81,7 @@
                 bootbox.alert("Waiting for the peer to answer...");
             });
             videocall.on('answered', function () {
+                console.debug("videocall.on(answer)");
                 bootbox.hideAll();
                 $('#call').removeAttr('disabled').html('Hangup')
                     .removeClass("btn-success").addClass("btn-danger")
@@ -95,8 +94,24 @@
                 $('#call').removeAttr('disabled').html('Call')
                     .removeClass("btn-danger").addClass("btn-success")
                     .unbind('click').click(doCall);
-                videoInput.pause();
                 videoOutput.srcObject = null;
+            });
+            videocall.on('stop', function (callstate) {
+                bootbox.hideAll();
+                videoOutput.srcObject = null;
+            });
+            videocall.on('addlocalstream', function (stream) {
+                console.log("addlocalstream: " + stream);
+                videoOutput.srcObject = null;
+                try {
+                    videoOutput.srcObject = stream;
+                } catch (e) {
+                    try {
+                        videoOutput.src = URL.createObjectURL(stream);
+                    } catch (e) {
+                        Janus.error("Error attaching stream to element");
+                    }
+                }
             });
             videocall.on('addremotestream', function (stream) {
                 console.log("addremotestream: " + videoOutput);
@@ -148,13 +163,11 @@
                             callback: function () {
                                 $('#peer').val(peername).attr('disabled', true);
                                 videocall.answer({
-                                    stream: localStream,
                                     success: function () {
                                         $('#peer').attr('disabled', true);
                                         $('#call').removeAttr('disabled').html('Hangup')
                                             .removeClass("btn-success").addClass("btn-danger")
                                             .unbind('click').click(doHangup);
-                                        videoInput.play();
                                     },
                                     error: function (error) {
                                         bootbox.alert("Could not answer: " + error);
@@ -175,21 +188,15 @@
         }
 
         // functions
-        function openStreamAction() {
-            videoInput.src = "video/video.webm";
-            //videoInput.play();
-            const fps = 0;
-            if (videoInput.captureStream) {
-                localStream = videoInput.captureStream(fps);
-            } else if (videoInput.mozCaptureStream) {
-                localStream = videoInput.mozCaptureStream(fps);
-            } else {
-                console.error('Stream capture is not supported');
-                localStream = null;
-            }
-            if (localStream) {
-                console.log('Received local stream.');
-            }
+        function register(username, callback) {
+            videocall.register(username, {
+                success: function () {
+                    callback.success();
+                },
+                error: function (error) {
+                    callback.success(error);
+                }
+            });
         }
 
         function doCall() {
@@ -209,9 +216,7 @@
                 $('#call').removeAttr('disabled').click(doCall);
                 return;
             }
-            videoInput.play();
             var options = {
-                stream: localStream,
                 isVideoCall: true
                 // isRecording: true,
                 // duration: 5
@@ -221,7 +226,7 @@
         function doHangup() {
             videocall.hangup();
         }
-       
+
     </script>
 </head>
 

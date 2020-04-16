@@ -38,7 +38,17 @@ function HashMap() {
     }, e
 }
 var internalID;
-
+var call_state = [
+    "CALL_INIT",
+    "CALL_BUSY",
+    "CALL_RINGING",
+    "CALL_ACCEPTED",
+    "CALL_REJECT",
+    "CALL_MISSED",
+    "CALL_STARTED",
+    "CALL_TIMEOUT",
+    "CALL_ENDED"
+];
 // VideoCall class
 function VideoCall() {
     this.isInited = false;
@@ -133,14 +143,14 @@ VideoCall.prototype.connect = function (account, callback) {
                             //self.callOnEvent('connected');
                             var register = { "request": "login", "username": account };
                             self.plugin.send({ "message": register });
-                            Janus.log("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
+                            console.debug("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
                         },
                         onlocalstream: function (stream) {
-                            Janus.log("onlocalstream");
+                            console.debug("onlocalstream");
                             self.callOnEvent('addlocalstream', stream);
                         },
                         onremotestream: function (stream) {
-                            Janus.log("onremotestream");
+                            console.debug("onremotestream");
                             self.callOnEvent('addremotestream', stream);
                         },
                         onmessage: function (msg, jsep) {
@@ -152,13 +162,13 @@ VideoCall.prototype.connect = function (account, callback) {
                                     var event = result["event"];
                                     if (event === 'connected') {
                                         self.myname = result["username"];
-                                        Janus.log("Successfully connected as username: " + self.myname + "!")
+                                        console.debug("Successfully connected as username: " + self.myname + "!")
                                         callback.success();
                                     } else if (event === 'calling') {
-                                        Janus.log("Waiting for the peer to answer...");
+                                        console.debug("Waiting for the peer to answer...");
                                         self.callOnEvent('calling');
                                     } else if (event === 'incomingcall') {
-                                        Janus.log("Incoming call from " + result["username"] + "!");
+                                        console.debug("Incoming call from " + result["username"] + "!");
                                         self.peername = result["username"];
                                         self.jsep.answer = jsep;
                                         self.ringing(true);
@@ -166,14 +176,14 @@ VideoCall.prototype.connect = function (account, callback) {
                                     } else if (event === 'accepted') {
                                         var peer = result["username"];
                                         if (peer === null || peer === undefined) {
-                                            Janus.log("Call started!");
+                                            console.debug("Call started!");
+                                            self.ringing(false);
                                         } else {
-                                            Janus.log(peer + " accepted the call!");
+                                            console.debug(peer + " accepted the call!");
                                             self.peername = peer;
                                         }
                                         if (jsep)
                                             self.plugin.handleRemoteJsep({ jsep: jsep });
-                                        self.ringing(false);
                                         self.callOnEvent('answered');
                                     } else if (event === 'update') {
                                         if (jsep) {
@@ -197,22 +207,33 @@ VideoCall.prototype.connect = function (account, callback) {
                                             }
                                         }
                                     } else if (event === 'hangup') {
-                                        Janus.log("Call hung up by " + result["username"] + " (" + result["reason"] + ")!");
+                                        console.debug("Call hung up by " + result["username"] + " (" + result["reason"] + ")!");
                                         self.plugin.hangup();
                                         self.ringing(false);
                                         self.callOnEvent('hangup', result["username"]);
                                     }
                                     else if (event === 'stop') {
-                                        Janus.log("Result: " + result["start_time"] + ", " + result["stop_time"] + ", " + result["record_path"] + ", " + result["call_state"]);
-                                        self.ringing(false);
-                                        //self.plugin.hangup();
-                                        self.callOnEvent('stop', result["call_state"]);
+                                        console.debug("Stop event: " + call_state[result["call_state"]]);
+                                        switch (call_state[result["call_state"]]) {
+                                            case "CALL_ENDED":
+                                            case "CALL_TIMEOUT":
+                                                console.debug("+ Start time: " + result["start_time"]);
+                                                console.debug("+ Stop time: " + result["stop_time"]);
+                                                if (result["record_path"])
+                                                    console.debug("+ Record path: " + result["record_path"]);
+                                                break;
+                                            case "CALL_ACCEPTED":
+                                                self.ringing(false);
+                                                break;
 
+                                        }                                       
+                                        self.plugin.hangup();
+                                        self.callOnEvent('stop', result["call_state"]);
                                     }
                                     else if (event === "timeout") {
                                         self.hangup();
                                         self.ringing(false);
-                                        Janus.log("The call timeout. Hangup by user " + result["username"]);
+                                        console.debug("The call timeout. Hangup by user " + result["username"]);
                                     }
                                 }
                             } else {
@@ -332,7 +353,10 @@ VideoCall.prototype.ringing = function (status) {
         }, 1000);
     }
     else {
-        clearInterval(internalID);
+        if (internalID != null) {
+            clearInterval(internalID);
+            internalID = null;
+        }
     }
 }
 // mute a call
