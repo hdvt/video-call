@@ -98,14 +98,14 @@
 			});
             videocall.on('addlocalstream', function (stream) {
                 console.log("addlocalstream: " + stream);
-                videoOutput.srcObject = null;
+                videoInput.srcObject = null;
                 try {
-                    videoOutput.srcObject = stream;
+                    videoInput.srcObject = stream;
                 } catch (e) {
                     try {
-                        videoOutput.src = URL.createObjectURL(stream);
+                        videoInput.src = URL.createObjectURL(stream);
                     } catch (e) {
-                        Janus.error("Error attaching stream to element");
+                        console.error("Error attaching stream to element");
                     }
                 }
             });
@@ -118,7 +118,7 @@
                     try {
                         videoOutput.src = URL.createObjectURL(stream);
                     } catch (e) {
-                        Janus.error("Error attaching stream to element");
+                        console.error("Error attaching stream to element");
                     }
                 }
                 $('#toggleaudio').html("Disable audio").removeClass("btn-success").addClass("btn-danger")
