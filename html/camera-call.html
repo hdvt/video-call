@@ -87,15 +87,15 @@
                     .removeClass("btn-success").addClass("btn-danger")
                     .unbind('click').click(doHangup);
             });
-            videocall.on('stop', function (callstate) {		
-				videoInput.srcObject = null;	
-				videoOutput.srcObject = null;
-				$('#peer').removeAttr('disabled').val('');
-				$('#call').removeAttr('disabled').html('Call')
-					.removeClass("btn-danger").addClass("btn-success")
-					.unbind('click').click(doCall);
-				bootbox.hideAll();
-			});
+            videocall.on('stop', function (callstate) {
+                videoInput.srcObject = null;
+                videoOutput.srcObject = null;
+                $('#peer').removeAttr('disabled').val('');
+                $('#call').removeAttr('disabled').html('Call')
+                    .removeClass("btn-danger").addClass("btn-success")
+                    .unbind('click').click(doCall);
+                bootbox.hideAll();
+            });
             videocall.on('addlocalstream', function (stream) {
                 console.log("addlocalstream: " + stream);
                 videoInput.srcObject = null;
@@ -235,7 +235,7 @@
                     </h1>
                 </div>
 
-                <div class="container" id="videocall">
+                <div class="container" id="videocall" id="videos">
                     <div class="row">
                         <div class="col-md-6 container" id="login">
                             <span class="hide label label-info" id="youok"></span>
@@ -269,8 +269,7 @@
                                     </h3>
                                 </div>
                                 <div class="panel-body" id="videoleft">
-                                    <video class="rounded centered" id="myvideo" width=320 height=240 controls loop
-                                        pause playsinline />'
+                                    <video class="rounded centered" id="myvideo" loop playsinline />'
                                 </div>
                             </div>
                         </div>
@@ -281,8 +280,7 @@
                                     <h3 class="panel-title">Remote Stream</h3>
                                 </div>
                                 <div class="panel-body" id="videoright">
-                                    <video class="rounded centered" id="remotevideo" width=320 height=240 autoplay
-                                        playsinline />
+                                    <video class="rounded centered" id="remotevideo" autoplay playsinline />
                                 </div>
                             </div>
                         </div>

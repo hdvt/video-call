@@ -88,8 +88,8 @@
 					.removeClass("btn-success").addClass("btn-danger")
 					.unbind('click').click(doHangup);
 			});
-			videocall.on('stop', function (callstate) {		
-				videoInput.srcObject = null;	
+			videocall.on('stop', function (callstate) {
+				videoInput.srcObject = null;
 				videoOutput.srcObject = null;
 				$('#peer').removeAttr('disabled').val('');
 				$('#call').removeAttr('disabled').html('Call')
@@ -188,15 +188,15 @@
 
 		// functions
 		function register(username, callback) {
-            videocall.register(username, {
-                success: function () {
-                    callback.success();
-                },
-                error: function (error) {
-                    callback.success(error);
-                }
-            });
-        }
+			videocall.register(username, {
+				success: function () {
+					callback.success();
+				},
+				error: function (error) {
+					callback.success(error);
+				}
+			});
+		}
 
 		function openStreamAction() {
 			videoInput.src = "video/video.webm";
@@ -291,8 +291,7 @@
 									</h3>
 								</div>
 								<div class="panel-body" id="videoleft">
-									<video class="rounded centered" id="myvideo" width=320 height=240 controls loop
-										pause playsinline />'
+									<video class="rounded centered" id="myvideo" controls loop pause playsinline />'
 								</div>
 							</div>
 						</div>
@@ -303,8 +302,7 @@
 									<h3 class="panel-title">Remote Stream</h3>
 								</div>
 								<div class="panel-body" id="videoright">
-									<video class="rounded centered" id="remotevideo" width=320 height=240 autoplay
-										playsinline />
+									<video class="rounded centered" id="remotevideo" autoplay playsinline />
 								</div>
 							</div>
 						</div>
