@@ -170,6 +170,8 @@ LIBCURL_CFLAGS = @LIBCURL_CFLAGS@
 LIBCURL_LIBS = @LIBCURL_LIBS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSRTP_CFLAGS = @LIBSRTP_CFLAGS@
+LIBSRTP_LIBS = @LIBSRTP_LIBS@
 LIBSYSTEMD_CFLAGS = @LIBSYSTEMD_CFLAGS@
 LIBSYSTEMD_LIBS = @LIBSYSTEMD_LIBS@
 LIBTOOL = @LIBTOOL@
@@ -218,8 +220,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOFIA_CFLAGS = @SOFIA_CFLAGS@
 SOFIA_LIBS = @SOFIA_LIBS@
-SRTP15X_CFLAGS = @SRTP15X_CFLAGS@
-SRTP15X_LIBS = @SRTP15X_LIBS@
 STRIP = @STRIP@
 TRANSPORTS_CFLAGS = @TRANSPORTS_CFLAGS@
 TRANSPORTS_LIBS = @TRANSPORTS_LIBS@
@@ -389,10 +389,10 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+@ENABLE_DOCS_FALSE@html-local:
 @ENABLE_DOCS_FALSE@clean-local:
 @ENABLE_DOCS_FALSE@uninstall-local:
 @ENABLE_DOCS_FALSE@install-data-local:
-@ENABLE_DOCS_FALSE@html-local:
 clean: clean-am
 
 clean-am: clean-generic clean-libtool clean-local mostlyclean-am

@@ -616,6 +616,7 @@ am_janus_OBJECTS = janus-apierror.$(OBJEXT) janus-auth.$(OBJEXT) \
 	transports/janus-transport.$(OBJEXT)
 janus_OBJECTS = $(am_janus_OBJECTS)
 janus_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 janus_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(janus_CFLAGS) $(CFLAGS) \
@@ -652,6 +653,7 @@ am__janus_pp_rec_SOURCES_DIST = postprocessing/pp-cmdline.c \
 @ENABLE_POST_PROCESSING_TRUE@	janus_pp_rec-version.$(OBJEXT)
 janus_pp_rec_OBJECTS = $(am_janus_pp_rec_OBJECTS)
 @ENABLE_POST_PROCESSING_TRUE@janus_pp_rec_DEPENDENCIES =  \
+@ENABLE_POST_PROCESSING_TRUE@	$(am__DEPENDENCIES_1) \
 @ENABLE_POST_PROCESSING_TRUE@	$(am__DEPENDENCIES_1)
 janus_pp_rec_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(janus_pp_rec_CFLAGS) \
@@ -898,6 +900,8 @@ LIBCURL_CFLAGS = @LIBCURL_CFLAGS@
 LIBCURL_LIBS = @LIBCURL_LIBS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSRTP_CFLAGS = @LIBSRTP_CFLAGS@
+LIBSRTP_LIBS = @LIBSRTP_LIBS@
 LIBSYSTEMD_CFLAGS = @LIBSYSTEMD_CFLAGS@
 LIBSYSTEMD_LIBS = @LIBSYSTEMD_LIBS@
 LIBTOOL = @LIBTOOL@
@@ -946,8 +950,6 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOFIA_CFLAGS = @SOFIA_CFLAGS@
 SOFIA_LIBS = @SOFIA_LIBS@
-SRTP15X_CFLAGS = @SRTP15X_CFLAGS@
-SRTP15X_LIBS = @SRTP15X_LIBS@
 STRIP = @STRIP@
 TRANSPORTS_CFLAGS = @TRANSPORTS_CFLAGS@
 TRANSPORTS_LIBS = @TRANSPORTS_LIBS@
@@ -1141,6 +1143,8 @@ janus_SOURCES = \
 janus_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(JANUS_CFLAGS) \
+	$(LIBSRTP_CFLAGS) \
+	$(LIBCURL_CFLAGS) \
 	-DPLUGINDIR=\"$(plugindir)\" \
 	-DTRANSPORTDIR=\"$(transportdir)\" \
 	-DEVENTDIR=\"$(eventdir)\" \
@@ -1153,6 +1157,8 @@ janus_LDADD = \
 	$(BORINGSSL_LIBS) \
 	$(JANUS_LIBS) \
 	$(JANUS_MANUAL_LIBS) \
+	$(LIBSRTP_LDFLAGS) $(LIBSRTP_LIBS) \
+	$(LIBCURL_LDFLAGS) $(LIBCURL_LIBS) \
 	$(NULL)
 
 dist_man1_MANS = janus.1 janus-cfgconv.1 $(am__append_84)
@@ -1228,9 +1234,9 @@ events_libadd = \
 	$(NULL)
 
 @ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_SOURCES = events/janus_sampleevh.c
-@ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_CFLAGS = $(events_cflags)
-@ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_LDFLAGS = $(events_ldflags) -lcurl -lm
-@ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_LIBADD = $(events_libadd)
+@ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_CFLAGS = $(events_cflags) $(LIBCURL_CFLAGS)
+@ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_LDFLAGS = $(events_ldflags) $(LIBCURL_LDFLAGS) $(LIBCURL_LIBS) -lm
+@ENABLE_SAMPLEEVH_TRUE@events_libjanus_sampleevh_la_LIBADD = $(events_libadd) $(LIBCURL_LIBADD)
 @ENABLE_WSEVH_TRUE@events_libjanus_wsevh_la_SOURCES = events/janus_wsevh.c
 @ENABLE_WSEVH_TRUE@events_libjanus_wsevh_la_CFLAGS = $(events_cflags)
 @ENABLE_WSEVH_TRUE@events_libjanus_wsevh_la_LDFLAGS = $(events_ldflags) $(WS_MANUAL_LIBS)
@@ -1294,9 +1300,9 @@ plugins_libadd = \
 @ENABLE_PLUGIN_NOSIP_TRUE@plugins_libjanus_nosip_la_LDFLAGS = $(plugins_ldflags)
 @ENABLE_PLUGIN_NOSIP_TRUE@plugins_libjanus_nosip_la_LIBADD = $(plugins_libadd)
 @ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_SOURCES = plugins/janus_streaming.c
-@ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_CFLAGS = $(plugins_cflags) $(LIBCURL_CFLAGS)
-@ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_LDFLAGS = $(plugins_ldflags) $(LIBCURL_LDFLAGS) $(LIBCURL_LIBS)
-@ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_LIBADD = $(plugins_libadd) $(LIBCURL_LIBADD)
+@ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_CFLAGS = $(plugins_cflags) $(LIBCURL_CFLAGS) $(OGG_CFLAGS)
+@ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_LDFLAGS = $(plugins_ldflags) $(LIBCURL_LDFLAGS) $(LIBCURL_LIBS) $(OGG_LDFLAGS) $(OGG_LIBS)
+@ENABLE_PLUGIN_STREAMING_TRUE@plugins_libjanus_streaming_la_LIBADD = $(plugins_libadd) $(LIBCURL_LIBADD) $(OGG_LIBADD)
 @ENABLE_PLUGIN_VIDEOCALL_TRUE@plugins_libjanus_videocall_la_SOURCES = plugins/janus_videocall.c
 @ENABLE_PLUGIN_VIDEOCALL_TRUE@plugins_libjanus_videocall_la_CFLAGS = $(plugins_cflags)
 @ENABLE_PLUGIN_VIDEOCALL_TRUE@plugins_libjanus_videocall_la_LDFLAGS = $(plugins_ldflags)
@@ -1351,11 +1357,13 @@ plugins_libadd = \
 
 @ENABLE_POST_PROCESSING_TRUE@janus_pp_rec_CFLAGS = \
 @ENABLE_POST_PROCESSING_TRUE@	$(AM_CFLAGS) \
+@ENABLE_POST_PROCESSING_TRUE@	$(LIBCURL_CFLAGS) \
 @ENABLE_POST_PROCESSING_TRUE@	$(POST_PROCESSING_CFLAGS) \
 @ENABLE_POST_PROCESSING_TRUE@	$(NULL)
 
 @ENABLE_POST_PROCESSING_TRUE@janus_pp_rec_LDADD = \
 @ENABLE_POST_PROCESSING_TRUE@	$(POST_PROCESSING_LIBS) \
+@ENABLE_POST_PROCESSING_TRUE@	$(LIBCURL_LDFLAGS) $(LIBCURL_LIBS) \
 @ENABLE_POST_PROCESSING_TRUE@	$(NULL)
 
 @ENABLE_POST_PROCESSING_TRUE@mjr2pcap_SOURCES = \
