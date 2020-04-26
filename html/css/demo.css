@@ -119,3 +119,60 @@ pre {
 		color: #FFD700;
 	}
 }
+
+video,#console {
+	display: block;
+	font-size: 14px;
+	line-height: 1.42857143;
+	color: #555;
+	background-color: #fff;
+	background-image: none;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	-webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075);
+	box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075);
+	-webkit-transition: border-color ease-in-out .15s, box-shadow
+		ease-in-out .15s;
+	transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
+}
+
+.videoBig {
+	max-width: 100%;
+	height: auto;
+	top: 0;
+	left: 0;
+	z-index: 1;
+	object-fit:fill;
+}
+@media (min-aspect-ratio: 16/9) {
+	.videoBig{
+	 
+	  width: 100%;
+	  height: auto;
+	}
+  }
+  @media (max-aspect-ratio: 16/9) {
+	.videoBig {
+	 
+	 width:100%; 
+	  height: 100%;
+
+	  padding:0
+	}
+  }
+.videoSmall {
+	padding: 0px;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	cursor: pointer;
+	z-index: 10;
+	padding: 0px;
+	object-fit:fill;
+}
+
+div.dragged {
+	cursor: all-scroll !important;
+	border-color: blue !important;
+	z-index: 10 !important;
+}
