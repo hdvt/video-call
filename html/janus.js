@@ -1171,7 +1171,7 @@ function Janus(gatewayCallbacks) {
 						ondataopen : callbacks.ondataopen,
 						oncleanup : callbacks.oncleanup,
 						ondetached : callbacks.ondetached,
-						hangup : function(sendRequest) { cleanupWebrtc(handleId, sendRequest === true); },
+						hangup : function(sendRequest) { cleanupWebrtc(handleId, true); },
 						detach : function(callbacks) { destroyHandle(handleId, callbacks); }
 					};
 				pluginHandles[handleId] = pluginHandle;
@@ -1570,7 +1570,7 @@ function Janus(gatewayCallbacks) {
 		callbacks.error = (typeof callbacks.error == "function") ? callbacks.error : Janus.noop;
 		var noRequest = (callbacks.noRequest === true);
 		Janus.log("Destroying handle " + handleId + " (only-locally=" + noRequest + ")");
-		cleanupWebrtc(handleId);
+		cleanupWebrtc(handleId, true);
 		var pluginHandle = pluginHandles[handleId];
 		if(!pluginHandle || pluginHandle.detached) {
 			// Plugin was already detached by Janus, calling detach again will return a handle not found error, so just exit here
@@ -3087,7 +3087,7 @@ function Janus(gatewayCallbacks) {
 		Janus.log("Cleaning WebRTC stuff");
 		var pluginHandle = pluginHandles[handleId];
 		if(!pluginHandle) {
-			// Nothing to clean
+			// Nothing to clean	
 			return;
 		}
 		var config = pluginHandle.webrtcStuff;

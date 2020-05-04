@@ -515,6 +515,7 @@ void janus_videocall_destroy_session(janus_plugin_session *handle, int *error)
 	JANUS_LOG(LOG_VERB, "Removing VideoCall user %s session...\n", session->username ? session->username : "'unknown'");
 	if (session->username != NULL)
 	{
+		JANUS_LOG(LOG_INFO, "[%s-%p] User `%s` logout\n", JANUS_VIDEOCALL_PACKAGE, handle, session->username);
 		if (session->handles)
 		{
 			if (g_list_find(session->handles, handle))
@@ -820,7 +821,8 @@ void janus_videocall_incoming_rtp(janus_plugin_session *handle, janus_plugin_rtp
 			}
 			/* Save the frame if we're recording (and make sure the SSRC never changes even if the substream does) */
 			header->ssrc = htonl(1);
-			janus_recorder_save_frame(session->vrc, buf, len);
+			if (call->record)
+				janus_recorder_save_frame(video ? session->vrc : session->arc, buf, len);
 			/* Send the frame back */
 			gateway->relay_rtp(peer->handle, packet);
 			/* Restore header or core statistics will be messed up */
@@ -1017,9 +1019,10 @@ void janus_videocall_hangup_media(janus_plugin_session *handle)
 		return;
 	if (handle != session->handle)
 	{
-		JANUS_LOG(LOG_WARN, "Session isn't handling this handler\n");
+		JANUS_LOG(LOG_WARN, "[%s-%p] Session isn't handling this handler\n", JANUS_VIDEOCALL_PACKAGE, handle);
 		return;
 	}
+	JANUS_LOG(LOG_INFO, "[%s-%p] Username `%s` hangup\n", JANUS_VIDEOCALL_PACKAGE, handle, session->username);
 	/* Get rid of the recorders, if available */
 	janus_videocall_session *call = session->call;
 	if (call)
@@ -1081,7 +1084,22 @@ void janus_videocall_hangup_media(janus_plugin_session *handle)
 	session->peer = NULL;
 
 	if (peer)
-		gateway->close_pc(peer->handle);
+	{
+		if (peer->handle)
+			gateway->close_pc(peer->handle);
+		else
+		{
+			// reset controls of peer
+			if (g_atomic_int_compare_and_exchange(&peer->incall, 1, 0))
+				janus_refcount_decrease(&session->ref);
+			if (peer->call)
+			{
+				janus_refcount_decrease(&peer->call->ref);
+				peer->call = NULL;
+			}
+			peer->peer = NULL;
+		}
+	}
 
 	/* Reset controls */
 	session->has_audio = FALSE;
@@ -1224,9 +1242,9 @@ static void *janus_videocall_handler(void *data)
 			if (!janus_auth_check_token(username_text))
 			{
 				janus_mutex_unlock(&sessions_mutex);
-				JANUS_LOG(LOG_ERR, "Username '%s' hasn't registeded a token\n", username_text);
+				JANUS_LOG(LOG_ERR, "Username '%s' dose not exits\n", username_text);
 				error_code = JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN;
-				g_snprintf(error_cause, 512, "Username '%s' has not registeded a token", username_text);
+				g_snprintf(error_cause, 512, "Username '%s' dose not exits", username_text);
 				goto error;
 			}
 			janus_refcount_increase(&msg->handle->ref);
@@ -1235,22 +1253,16 @@ static void *janus_videocall_handler(void *data)
 			janus_mutex_unlock(&sessions_mutex);
 			if (exist_session != NULL)
 			{
-				JANUS_LOG(LOG_WARN, "Username '%s' already logged-in \n", username_text);
+				JANUS_LOG(LOG_WARN, "Username '%s' login again\n", username_text);
 				msg->handle->plugin_handle = exist_session;
 				exist_session->handles = g_list_append(exist_session->handles, msg->handle);
 				janus_refcount_increase(&exist_session->ref);
 				janus_refcount_decrease(&session->ref);
 				janus_refcount_decrease(&session->ref);
-				// janus_mutex_unlock(&sessions_mutex);
-				// JANUS_LOG(LOG_ERR, "Username '%s' already logged-in \n", username_text);
-				// error_code = JANUS_VIDEOCALL_ERROR_USERNAME_TAKEN;
-				// g_snprintf(error_cause, 512, "Username '%s' already logged-in ", username_text);
-				// int error;
-				// janus_videocall_destroy_session(msg->handle, &error);
-				// goto error;
 			}
 			else
 			{
+				JANUS_LOG(LOG_INFO, "Username '%s' login\n", username_text);
 				session->username = g_strdup(username_text);
 				session->handles = g_list_append(session->handles, msg->handle);
 				janus_mutex_lock(&sessions_mutex);
@@ -1286,9 +1298,9 @@ static void *janus_videocall_handler(void *data)
 			if (session->peer != NULL) // Already in a call
 			{
 				janus_mutex_unlock(&session->mutex);
-				JANUS_LOG(LOG_ERR, "Already in a call\n");
+				g_snprintf(error_cause, 512, "You have already in a call");
+				JANUS_LOG(LOG_ERR, "%s\n", error_cause);
 				error_code = JANUS_VIDEOCALL_ERROR_ALREADY_IN_CALL;
-				g_snprintf(error_cause, 512, "Already in a call");
 				/* Hangup the call attempt of the user */
 				gateway->close_pc(msg->handle);
 				goto error;
@@ -1320,9 +1332,9 @@ static void *janus_videocall_handler(void *data)
 			{
 				g_atomic_int_set(&session->incall, 0);
 				janus_mutex_unlock(&session->mutex);
-				JANUS_LOG(LOG_ERR, "You can't call yourself... use the EchoTest for that\n");
+				JANUS_LOG(LOG_ERR, "You can't call yourself\n");
 				error_code = JANUS_VIDEOCALL_ERROR_USE_ECHO_TEST;
-				g_snprintf(error_cause, 512, "You can't call yourself... use the EchoTest for that");
+				g_snprintf(error_cause, 512, "You can't call yourself");
 				/* Hangup the call attempt of the user */
 				gateway->close_pc(msg->handle);
 				goto error;
@@ -1333,9 +1345,10 @@ static void *janus_videocall_handler(void *data)
 			{
 				g_atomic_int_set(&session->incall, 0);
 				janus_mutex_unlock(&sessions_mutex);
-				JANUS_LOG(LOG_ERR, "Username '%s' doesn't exist\n", username_text);
+				janus_mutex_unlock(&session->mutex); // fix deadlock
+				g_snprintf(error_cause, 512, "Username '%s' does not exist", username_text);
+				JANUS_LOG(LOG_ERR, "%s\n", error_cause);
 				error_code = JANUS_VIDEOCALL_ERROR_NO_SUCH_USERNAME;
-				g_snprintf(error_cause, 512, "Username '%s' doesn't exist", username_text);
 				/* Hangup the call attempt of the user */
 				gateway->close_pc(msg->handle);
 				goto error;
@@ -1352,7 +1365,7 @@ static void *janus_videocall_handler(void *data)
 					janus_refcount_decrease(&peer->ref);
 				}
 				janus_mutex_unlock(&sessions_mutex);
-				JANUS_LOG(LOG_VERB, "%s is busy\n", username_text);
+				JANUS_LOG(LOG_VERB, "User `%s` is busy\n", username_text);
 
 				// send stop event
 				result = json_object();
@@ -1364,20 +1377,6 @@ static void *janus_videocall_handler(void *data)
 				int ret = gateway->push_event(msg->handle, &janus_videocall_plugin, NULL, event, NULL);
 				JANUS_LOG(LOG_VERB, "  >> Pushing event: %d (%s)\n", ret, janus_get_api_error(ret));
 				json_decref(result);
-
-				// result = json_object();
-				// json_object_set_new(result, "event", json_string("hangup"));
-				// json_object_set_new(result, "username", json_string(session->username));
-				// json_object_set_new(result, "reason", json_string("User busy"));
-				// /* Also notify event handlers */
-				// if (notify_events && gateway->events_is_enabled())
-				// {
-				// 	json_t *info = json_object();
-				// 	json_object_set_new(info, "event", json_string("hangup"));
-				// 	json_object_set_new(info, "reason", json_string("User busy"));
-				// 	gateway->notify_event(&janus_videocall_plugin, msg->handle, info);
-				// }
-				/* Hangup the call attempt of the user */
 				gateway->close_pc(msg->handle);
 			}
 			else
@@ -1424,12 +1423,16 @@ static void *janus_videocall_handler(void *data)
 						janus_refcount_decrease(&session->ref);
 						janus_refcount_decrease(&peer->ref);
 					}
+					janus_mutex_unlock(&session->mutex);
 					janus_mutex_unlock(&sessions_mutex);
 					JANUS_LOG(LOG_ERR, "Missing parameters (videocall, record)\n");
 					error_code = JANUS_VIDEOCALL_ERROR_INVALID_SDP;
 					g_snprintf(error_cause, 512, "Missing parameters (videocall, record)");
 					goto error;
 				}
+				janus_mutex_unlock(&sessions_mutex);
+
+				// preparing to call
 				g_atomic_int_set(&peer->incall, 1);
 				session->peer = peer;
 				peer->peer = session;
@@ -1438,7 +1441,6 @@ static void *janus_videocall_handler(void *data)
 				session->has_audio = (strstr(msg_sdp, "m=audio") != NULL);
 				session->has_video = (strstr(msg_sdp, "m=video") != NULL);
 				session->has_data = (strstr(msg_sdp, "DTLS/SCTP") != NULL);
-				janus_mutex_unlock(&sessions_mutex);
 				JANUS_LOG(LOG_VERB, "%s is calling %s\n", session->username, peer->username);
 				JANUS_LOG(LOG_VERB, "This is involving a negotiation (%s) as well:\n%s\n", msg_sdp_type, msg_sdp);
 				/* Check if this user will simulcast */
@@ -2047,4 +2049,5 @@ static void *janus_videocall_record_handler(void *data)
 		else
 			JANUS_LOG(LOG_ERR, "Record successfully...\n");
 	}
+	JANUS_LOG(LOG_INFO, "VideoCall record handler thread has stopped...\n");
 }

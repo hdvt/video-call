@@ -64,6 +64,7 @@ function VideoCall() {
     this.isAttached = false;
     this.videoenabled = true;
     this.audioenabled = true;
+    this.simulcastStarted = false;
     this.jsep = {
         offer: null,
         answer: null
@@ -112,7 +113,7 @@ VideoCall.prototype.connect = function (account, callback) {
             server: this.media_server,
             iceServers: [
                 {
-                    'urls': 'stun:stun.l.google.com:19302'
+                    'urls': 'stun:bangtv.ml:3478'
                 },
                 {
                     'urls': 'turn:bangtv.ml:3478?transport=tcp',
@@ -194,6 +195,7 @@ VideoCall.prototype.connect = function (account, callback) {
                                                     {
                                                         jsep: jsep,
                                                         media: { data: true },
+                                                        simulcast: false,
                                                         success: function (jsep) {
                                                             Janus.debug("Got SDP!");
                                                             Janus.debug(jsep);
@@ -206,13 +208,7 @@ VideoCall.prototype.connect = function (account, callback) {
                                                     });
                                             }
                                         }
-                                    } else if (event === 'hangup') {
-                                        console.debug("Call hung up by " + result["username"] + " (" + result["reason"] + ")!");
-                                        self.plugin.hangup();
-                                        self.ringing(false);
-                                        self.callOnEvent('hangup', result["username"]);
-                                    }
-                                    else if (event === 'stop') {
+                                    } else if (event === 'stop') {
                                         console.debug("Stop event: " + call_state[result["call_state"]]);
                                         switch (call_state[result["call_state"]]) {
                                             case "CALL_ENDED":
@@ -225,8 +221,10 @@ VideoCall.prototype.connect = function (account, callback) {
                                             case "CALL_ACCEPTED":
                                                 self.ringing(false);
                                                 break;
-
-                                        }                                       
+                                            case "CALL_BUSY":
+                                                bootbox.alert("Callee is busy now");
+                                                break;
+                                        }
                                         self.plugin.hangup();
                                         self.callOnEvent('stop', result["call_state"]);
                                     }
@@ -235,17 +233,32 @@ VideoCall.prototype.connect = function (account, callback) {
                                         self.ringing(false);
                                         console.debug("The call timeout. Hangup by user " + result["username"]);
                                     }
+                                    else if (event === "simulcast") {
+                                        // Is simulcast in place?
+                                        console.debug("Simulcast event");
+                                        var substream = result["substream"];
+                                        var temporal = result["temporal"];
+                                        if ((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
+                                            if (!self.simulcastStarted) {
+                                                self.simulcastStarted = true;
+                                                self.addSimulcastButtons(result["videocodec"] === "vp8" || result["videocodec"] === "h264");
+                                            }
+                                            // We just received notice that there's been a switch, update the buttons
+                                            self.updateSimulcastButtons(substream, temporal);
+                                        }
+                                    }
                                 }
                             } else {
                                 // FIXME Error?
                                 var error = msg["error"];
-                                bootbox.alert(error + " test");
+                                bootbox.alert("Error: " + error);
                                 if (error.indexOf("already taken") > 0) {
                                     // FIXME Use status codes...
                                     callback.error("Username has already taken");
                                 }
                                 // TODO Reset status
                                 self.plugin.hangup();
+                                self.callOnEvent('stop', "error");
                             }
                         },
                         error: function (error) {
@@ -294,6 +307,7 @@ VideoCall.prototype.register = function (token, callback) {
 VideoCall.prototype.makeCall = function (peer, options) {
     // Call this user
     var self = this;
+    self.plugin.hangup();
     if (options.stream) {
         console.log("Local stream: " + options.stream);
     }
@@ -301,6 +315,7 @@ VideoCall.prototype.makeCall = function (peer, options) {
         {
             media: { data: false },
             stream: options.stream ? options.stream : null,
+            simulcast: false,
             success: function (jsep) {
                 Janus.debug("Got SDP!");
                 Janus.debug(jsep);
@@ -328,6 +343,7 @@ VideoCall.prototype.answer = function (options) {
         {
             jsep: self.jsep.answer,
             media: { data: false },
+            simulcast: false,
             stream: options.stream ? options.stream : null,
             success: function (jsep) {
                 Janus.debug("Got SDP!");
@@ -386,3 +402,126 @@ VideoCall.prototype.hangup = function () {
 
 
 
+// temp functions
+// Helpers to create Simulcast-related UI, if enabled
+VideoCall.prototype.addSimulcastButtons = function (temporal) {
+    var self = this;
+    $('#curres').parent().append(
+        '<div id="simulcast" class="btn-group-vertical btn-group-vertical-xs pull-right">' +
+        '	<div class"row">' +
+        '		<div class="btn-group btn-group-xs" style="width: 100%">' +
+        '			<button id="sl-2" type="button" class="btn btn-primary" data-toggle="tooltip" title="Switch to higher quality" style="width: 33%">SL 2</button>' +
+        '			<button id="sl-1" type="button" class="btn btn-primary" data-toggle="tooltip" title="Switch to normal quality" style="width: 33%">SL 1</button>' +
+        '			<button id="sl-0" type="button" class="btn btn-primary" data-toggle="tooltip" title="Switch to lower quality" style="width: 34%">SL 0</button>' +
+        '		</div>' +
+        '	</div>' +
+        '	<div class"row">' +
+        '		<div class="btn-group btn-group-xs hide" style="width: 100%">' +
+        '			<button id="tl-2" type="button" class="btn btn-primary" data-toggle="tooltip" title="Cap to temporal layer 2" style="width: 34%">TL 2</button>' +
+        '			<button id="tl-1" type="button" class="btn btn-primary" data-toggle="tooltip" title="Cap to temporal layer 1" style="width: 33%">TL 1</button>' +
+        '			<button id="tl-0" type="button" class="btn btn-primary" data-toggle="tooltip" title="Cap to temporal layer 0" style="width: 33%">TL 0</button>' +
+        '		</div>' +
+        '	</div>' +
+        '</div>');
+    // Enable the simulcast selection buttons
+    $('#sl-0').removeClass('btn-primary btn-success').addClass('btn-primary')
+        .unbind('click').click(function () {
+            toastr.info("Switching simulcast substream, wait for it... (lower quality)", null, { timeOut: 2000 });
+            if (!$('#sl-2').hasClass('btn-success'))
+                $('#sl-2').removeClass('btn-primary btn-info').addClass('btn-primary');
+            if (!$('#sl-1').hasClass('btn-success'))
+                $('#sl-1').removeClass('btn-primary btn-info').addClass('btn-primary');
+            $('#sl-0').removeClass('btn-primary btn-info btn-success').addClass('btn-info');
+            self.plugin.send({ message: { request: "set", substream: 0 } });
+        });
+    $('#sl-1').removeClass('btn-primary btn-success').addClass('btn-primary')
+        .unbind('click').click(function () {
+            toastr.info("Switching simulcast substream, wait for it... (normal quality)", null, { timeOut: 2000 });
+            if (!$('#sl-2').hasClass('btn-success'))
+                $('#sl-2').removeClass('btn-primary btn-info').addClass('btn-primary');
+            $('#sl-1').removeClass('btn-primary btn-info btn-success').addClass('btn-info');
+            if (!$('#sl-0').hasClass('btn-success'))
+                $('#sl-0').removeClass('btn-primary btn-info').addClass('btn-primary');
+            self.plugin.send({ message: { request: "set", substream: 1 } });
+        });
+    $('#sl-2').removeClass('btn-primary btn-success').addClass('btn-primary')
+        .unbind('click').click(function () {
+            toastr.info("Switching simulcast substream, wait for it... (higher quality)", null, { timeOut: 2000 });
+            $('#sl-2').removeClass('btn-primary btn-info btn-success').addClass('btn-info');
+            if (!$('#sl-1').hasClass('btn-success'))
+                $('#sl-1').removeClass('btn-primary btn-info').addClass('btn-primary');
+            if (!$('#sl-0').hasClass('btn-success'))
+                $('#sl-0').removeClass('btn-primary btn-info').addClass('btn-primary');
+            self.plugin.send({ message: { request: "set", substream: 2 } });
+        });
+    if (!temporal)	// No temporal layer support
+        return;
+    $('#tl-0').parent().removeClass('hide');
+    $('#tl-0').removeClass('btn-primary btn-success').addClass('btn-primary')
+        .unbind('click').click(function () {
+            toastr.info("Capping simulcast temporal layer, wait for it... (lowest FPS)", null, { timeOut: 2000 });
+            if (!$('#tl-2').hasClass('btn-success'))
+                $('#tl-2').removeClass('btn-primary btn-info').addClass('btn-primary');
+            if (!$('#tl-1').hasClass('btn-success'))
+                $('#tl-1').removeClass('btn-primary btn-info').addClass('btn-primary');
+            $('#tl-0').removeClass('btn-primary btn-info btn-success').addClass('btn-info');
+            self.plugin.send({ message: { request: "set", temporal: 0 } });
+        });
+    $('#tl-1').removeClass('btn-primary btn-success').addClass('btn-primary')
+        .unbind('click').click(function () {
+            toastr.info("Capping simulcast temporal layer, wait for it... (medium FPS)", null, { timeOut: 2000 });
+            if (!$('#tl-2').hasClass('btn-success'))
+                $('#tl-2').removeClass('btn-primary btn-info').addClass('btn-primary');
+            $('#tl-1').removeClass('btn-primary btn-info').addClass('btn-info');
+            if (!$('#tl-0').hasClass('btn-success'))
+                $('#tl-0').removeClass('btn-primary btn-info').addClass('btn-primary');
+            self.plugin.send({ message: { request: "set", temporal: 1 } });
+        });
+    $('#tl-2').removeClass('btn-primary btn-success').addClass('btn-primary')
+        .unbind('click').click(function () {
+            toastr.info("Capping simulcast temporal layer, wait for it... (highest FPS)", null, { timeOut: 2000 });
+            $('#tl-2').removeClass('btn-primary btn-info btn-success').addClass('btn-info');
+            if (!$('#tl-1').hasClass('btn-success'))
+                $('#tl-1').removeClass('btn-primary btn-info').addClass('btn-primary');
+            if (!$('#tl-0').hasClass('btn-success'))
+                $('#tl-0').removeClass('btn-primary btn-info').addClass('btn-primary');
+            self.plugin.send({ message: { request: "set", temporal: 2 } });
+        });
+}
+
+VideoCall.prototype.updateSimulcastButtons = function (substream, temporal) {
+    // Check the substream
+    if (substream === 0) {
+        toastr.success("Switched simulcast substream! (lower quality)", null, { timeOut: 2000 });
+        $('#sl-2').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#sl-1').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#sl-0').removeClass('btn-primary btn-info btn-success').addClass('btn-success');
+    } else if (substream === 1) {
+        toastr.success("Switched simulcast substream! (normal quality)", null, { timeOut: 2000 });
+        $('#sl-2').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#sl-1').removeClass('btn-primary btn-info btn-success').addClass('btn-success');
+        $('#sl-0').removeClass('btn-primary btn-success').addClass('btn-primary');
+    } else if (substream === 2) {
+        toastr.success("Switched simulcast substream! (higher quality)", null, { timeOut: 2000 });
+        $('#sl-2').removeClass('btn-primary btn-info btn-success').addClass('btn-success');
+        $('#sl-1').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#sl-0').removeClass('btn-primary btn-success').addClass('btn-primary');
+    }
+    // Check the temporal layer
+    if (temporal === 0) {
+        toastr.success("Capped simulcast temporal layer! (lowest FPS)", null, { timeOut: 2000 });
+        $('#tl-2').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#tl-1').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#tl-0').removeClass('btn-primary btn-info btn-success').addClass('btn-success');
+    } else if (temporal === 1) {
+        toastr.success("Capped simulcast temporal layer! (medium FPS)", null, { timeOut: 2000 });
+        $('#tl-2').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#tl-1').removeClass('btn-primary btn-info btn-success').addClass('btn-success');
+        $('#tl-0').removeClass('btn-primary btn-success').addClass('btn-primary');
+    } else if (temporal === 2) {
+        toastr.success("Capped simulcast temporal layer! (highest FPS)", null, { timeOut: 2000 });
+        $('#tl-2').removeClass('btn-primary btn-info btn-success').addClass('btn-success');
+        $('#tl-1').removeClass('btn-primary btn-success').addClass('btn-primary');
+        $('#tl-0').removeClass('btn-primary btn-success').addClass('btn-primary');
+    }
+}
