@@ -1212,7 +1212,8 @@ int janus_process_incoming_request(janus_request *request)
 		janus_refcount_increase(&handle->ref);
 		/* Attach to the plugin */
 		int error = 0;
-		if ((error = janus_ice_handle_attach_plugin(session, handle, plugin_t)) != 0)
+		
+		if ((error = janus_ice_handle_attach_plugin(session, handle, plugin_t, json_string_value(json_object_get(root, "token")))) != 0)
 		{
 			/* TODO Make error struct to pass verbose information */
 			janus_session_handles_remove(session, handle);

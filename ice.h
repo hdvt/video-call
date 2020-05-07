@@ -584,7 +584,7 @@ janus_ice_handle *janus_ice_handle_create(void *core_session, const char *opaque
  * @param[in] handle The Janus ICE handle
  * @param[in] plugin The plugin the ICE handle needs to be attached to
  * @returns 0 in case of success, a negative integer otherwise */
-gint janus_ice_handle_attach_plugin(void *core_session, janus_ice_handle *handle, janus_plugin *plugin);
+gint janus_ice_handle_attach_plugin(void *core_session, janus_ice_handle *handle, janus_plugin *plugin, const char *token);
 /*! \brief Method to destroy a Janus ICE handle
  * @param[in] core_session The core/peer session this ICE handle belongs to
  * @param[in] handle The Janus ICE handle to destroy

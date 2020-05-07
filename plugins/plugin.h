@@ -235,6 +235,8 @@ typedef struct json_t json_t;
 
 /*! \brief Plugin-Gateway session mapping */
 struct janus_plugin_session {
+	/*! token */
+	const char* token;
 	/*! \brief Opaque pointer to the Janus core-level handle */
 	void *gateway_handle;
 	/*! \brief Opaque pointer to the plugin session */

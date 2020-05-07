@@ -466,8 +466,20 @@ void janus_videocall_create_session(janus_plugin_session *handle, int *error)
 		*error = -1;
 		return;
 	}
+	// check exits session
+	janus_mutex_lock(&sessions_mutex);
+	janus_user_session *exist_session = (janus_user_session *)g_hash_table_lookup(sessions, handle->token);
+	janus_mutex_unlock(&sessions_mutex);
+	if (exist_session != NULL)
+	{
+		JANUS_LOG(LOG_WARN, "Username '%s' login again\n", handle->token);
+		handle->plugin_handle = exist_session;
+		exist_session->handles = g_list_append(exist_session->handles, handle);
+		janus_refcount_increase(&exist_session->ref);
+		return;
+	}
+
 	janus_user_session *session = g_malloc0(sizeof(janus_user_session));
-	session->handles = NULL;
 	session->handle = NULL;
 	session->curr_handle = NULL;
 	session->call = NULL;
@@ -479,7 +491,7 @@ void janus_videocall_create_session(janus_plugin_session *handle, int *error)
 	session->bitrate = 0; /* No limit */
 	session->peer_bitrate = 0;
 	session->peer = NULL;
-	session->username = NULL;
+	session->username = g_strdup(handle->token);
 	janus_rtp_switching_context_reset(&session->context);
 	janus_rtp_simulcasting_context_reset(&session->sim_context);
 	janus_vp8_simulcast_context_reset(&session->vp8_context);
@@ -489,9 +501,13 @@ void janus_videocall_create_session(janus_plugin_session *handle, int *error)
 	g_atomic_int_set(&session->incall, 0);
 	g_atomic_int_set(&session->hangingup, 0);
 	g_atomic_int_set(&session->destroyed, 0);
-	handle->plugin_handle = session;
+	session->handles = g_list_append(session->handles, handle);
+	janus_mutex_lock(&sessions_mutex);
+	g_hash_table_insert(sessions, (gpointer)session->username, session);
+	janus_mutex_unlock(&sessions_mutex);
 	janus_refcount_init(&session->ref, janus_user_session_free);
-
+	handle->plugin_handle = session;
+	JANUS_LOG(LOG_INFO, "Username '%s' login\n", session->username);
 	return;
 }
 

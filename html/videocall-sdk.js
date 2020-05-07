@@ -37,6 +37,9 @@ function HashMap() {
         }
     }, e
 }
+
+
+
 var internalID;
 var call_state = [
     "CALL_INIT",
@@ -49,15 +52,53 @@ var call_state = [
     "CALL_TIMEOUT",
     "CALL_ENDED"
 ];
+
+// // Chat class
+// function Chat(server){
+//     this.janus = server;
+//     this.plugin_name = "janus.plugin.chat";
+//     this.myname = null;
+//     this.peername = null;
+//     this.jsep = {
+//         offer: null,
+//         answer: null
+//     };
+// }
+
+// // connect to server
+// Chat.prototype.connect = function (callback) {
+//     self = this;
+//     self.janus.attach(
+//         {
+//             plugin: this.plugin_name,
+//             opaqueId: "chat-" + Janus.randomString(12),
+//             success: function (pluginHandle) {
+//                 self.plugin = pluginHandle;
+//                 self.isAttached = true;
+//                 console.debug("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
+//                 callback.success();
+//             },
+//             ondataopen: function (data) {
+//                 console.log("The DataChannel is available!");                
+//             },
+//             ondata: function (data) {
+//                 console.log("We got data from the DataChannel! " + data);
+//                 $('#datarecv').val(data);
+//             },
+//             error: function (error) {
+//                 Janus.error("  -- Error attaching plugin...", error);
+//             }
+//         });
+// }
+
+
+
 // VideoCall class
-function VideoCall() {
-    this.isInited = false;
-    this.media_server = null;
-    this.admin_server = null;
-    this.janus = null;
+function VideoCall(server) {
+    this.janus = server;
     this.plugin = null;
-    this.plugin_name = null;
-    this._onMethods = null;
+    this.plugin_name = "janus.plugin.videocall";
+    this._onMethods = new HashMap();
     this.myname = null;
     this.peername = null;
     this.isConnected = false;
@@ -71,24 +112,7 @@ function VideoCall() {
     };
 }
 
-// init 
-VideoCall.prototype.init = function (callback) {
-    if (!Janus.isWebrtcSupported()) {
-        callback.error("No WebRTC support... ");
-        return;
-    }
-    Janus.init({
-        debug: true,
-        callback: (function () {
-            this.media_server = "http://" + window.location.hostname + ":8088/janus";
-            this.admin_server = "http://" + window.location.hostname + ":7088/admin";
-            this.plugin_name = "janus.plugin.videocall";
-            this._onMethods = new HashMap();
-            this.isInited = true;
-            callback.success();
-        }).bind(this)
-    });
-}
+
 
 // add event to _onMethods 
 VideoCall.prototype.on = function (e, t) {
@@ -101,178 +125,139 @@ VideoCall.prototype.callOnEvent = function (e, t) {
     r ? t ? r.call(this, t) : r.call(this) : console.log("Please implement event: " + e)
 }
 
-// check init
-VideoCall.prototype.isInit = function () {
-    return this.isInited;
-}
 // connect to server
-VideoCall.prototype.connect = function (account, callback) {
-    var self = this;
-    self.janus = new Janus(
+VideoCall.prototype.connect = function (callback) {
+    self = this;
+    self.janus.attach(
         {
-            server: this.media_server,
-            iceServers: [
-                {
-                    'urls': 'stun:bangtv.ml:3478'
-                },
-                {
-                    'urls': 'turn:bangtv.ml:3478?transport=tcp',
-                    'credential': '1231234',
-                    'username': 'bangtran'
-                },
-                {
-                    'urls': 'turn:bangtv.ml:3478?transport=udp',
-                    'credential': '1231234',
-                    'username': 'bangtran'
-                },
-                {
-                    'urls': 'turn:bangtv.ml:443?transport=tcp',
-                    'credential': '1231234',
-                    'username': 'bangtran'
-                }
-            ],
-            token: account,
-            success: function () {
-                self.isConnected = true;
-                self.janus.attach(
-                    {
-                        plugin: self.plugin_name,
-                        opaqueId: "videocalltest-" + Janus.randomString(12),
-                        success: function (pluginHandle) {
-                            self.plugin = pluginHandle;
-                            self.isAttached = true;
-                            //self.callOnEvent('connected');
-                            var register = { "request": "login", "username": account };
-                            self.plugin.send({ "message": register });
-                            console.debug("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
-                        },
-                        onlocalstream: function (stream) {
-                            console.debug("onlocalstream");
-                            self.callOnEvent('addlocalstream', stream);
-                        },
-                        onremotestream: function (stream) {
-                            console.debug("onremotestream");
-                            self.callOnEvent('addremotestream', stream);
-                        },
-                        onmessage: function (msg, jsep) {
-                            Janus.debug(" ::: Got a message :::");
-                            Janus.debug(msg);
-                            var result = msg["result"];
-                            if (result !== null && result !== undefined) {
-                                if (result["event"] !== undefined && result["event"] !== null) {
-                                    var event = result["event"];
-                                    if (event === 'connected') {
-                                        self.myname = result["username"];
-                                        console.debug("Successfully connected as username: " + self.myname + "!")
-                                        callback.success();
-                                    } else if (event === 'calling') {
-                                        console.debug("Waiting for the peer to answer...");
-                                        self.callOnEvent('calling');
-                                    } else if (event === 'incomingcall') {
-                                        console.debug("Incoming call from " + result["username"] + "!");
-                                        self.peername = result["username"];
-                                        self.jsep.answer = jsep;
-                                        self.ringing(true);
-                                        self.callOnEvent('incomingcall', self.peername);
-                                    } else if (event === 'accepted') {
-                                        var peer = result["username"];
-                                        if (peer === null || peer === undefined) {
-                                            console.debug("Call started!");
-                                            self.ringing(false);
-                                        } else {
-                                            console.debug(peer + " accepted the call!");
-                                            self.peername = peer;
-                                        }
-                                        if (jsep)
-                                            self.plugin.handleRemoteJsep({ jsep: jsep });
-                                        self.callOnEvent('answered');
-                                    } else if (event === 'update') {
-                                        if (jsep) {
-                                            if (jsep.type === "answer") {
-                                                self.plugin, handleRemoteJsep({ jsep: jsep });
-                                            } else {
-                                                self.plugin, createAnswer(
-                                                    {
-                                                        jsep: jsep,
-                                                        media: { data: true },
-                                                        simulcast: false,
-                                                        success: function (jsep) {
-                                                            Janus.debug("Got SDP!");
-                                                            Janus.debug(jsep);
-                                                            var body = { "request": "set" };
-                                                            self.plugin, send({ "message": body, "jsep": jsep });
-                                                        },
-                                                        error: function (error) {
-                                                            Janus.error("WebRTC error:", error);
-                                                        }
-                                                    });
-                                            }
-                                        }
-                                    } else if (event === 'stop') {
-                                        console.debug("Stop event: " + call_state[result["call_state"]]);
-                                        switch (call_state[result["call_state"]]) {
-                                            case "CALL_ENDED":
-                                            case "CALL_TIMEOUT":
-                                                console.debug("+ Start time: " + result["start_time"]);
-                                                console.debug("+ Stop time: " + result["stop_time"]);
-                                                if (result["record_path"])
-                                                    console.debug("+ Record path: " + result["record_path"]);
-                                                break;
-                                            case "CALL_ACCEPTED":
-                                                self.ringing(false);
-                                                break;
-                                            case "CALL_BUSY":
-                                                bootbox.alert("Callee is busy now");
-                                                break;
-                                        }
-                                        self.plugin.hangup();
-                                        self.callOnEvent('stop', result["call_state"]);
-                                    }
-                                    else if (event === "timeout") {
-                                        self.hangup();
-                                        self.ringing(false);
-                                        console.debug("The call timeout. Hangup by user " + result["username"]);
-                                    }
-                                    else if (event === "simulcast") {
-                                        // Is simulcast in place?
-                                        console.debug("Simulcast event");
-                                        var substream = result["substream"];
-                                        var temporal = result["temporal"];
-                                        if ((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
-                                            if (!self.simulcastStarted) {
-                                                self.simulcastStarted = true;
-                                                self.addSimulcastButtons(result["videocodec"] === "vp8" || result["videocodec"] === "h264");
-                                            }
-                                            // We just received notice that there's been a switch, update the buttons
-                                            self.updateSimulcastButtons(substream, temporal);
-                                        }
-                                    }
-                                }
+            plugin: this.plugin_name,
+            opaqueId: "videocalltest-" + Janus.randomString(12),
+            success: function (pluginHandle) {
+                self.plugin = pluginHandle;
+                self.isAttached = true;
+                console.debug("Plugin attached! (" + self.plugin.getPlugin() + ", id=" + self.plugin.getId() + ")");
+                callback.success();
+            },
+            onlocalstream: function (stream) {
+                console.debug("onlocalstream");
+                self.callOnEvent('addlocalstream', stream);
+            },
+            onremotestream: function (stream) {
+                console.debug("onremotestream");
+                self.callOnEvent('addremotestream', stream);
+            },
+            onmessage: function (msg, jsep) {
+                Janus.debug(" ::: Got a message :::");
+                Janus.debug(msg);
+                var result = msg["result"];
+                if (result !== null && result !== undefined) {
+                    if (result["event"] !== undefined && result["event"] !== null) {
+                        var event = result["event"];
+                        if (event === 'connected') {
+                            self.myname = result["username"];
+                            console.debug("Successfully connected as username: " + self.myname + "!")
+                            callback.success();
+                        } else if (event === 'calling') {
+                            console.debug("Waiting for the peer to answer...");
+                            self.callOnEvent('calling');
+                        } else if (event === 'incomingcall') {
+                            console.debug("Incoming call from " + result["username"] + "!");
+                            self.peername = result["username"];
+                            self.jsep.answer = jsep;
+                            self.ringing(true);
+                            self.callOnEvent('incomingcall', self.peername);
+                        } else if (event === 'accepted') {
+                            var peer = result["username"];
+                            if (peer === null || peer === undefined) {
+                                console.debug("Call started!");
+                                self.ringing(false);
                             } else {
-                                // FIXME Error?
-                                var error = msg["error"];
-                                bootbox.alert("Error: " + error);
-                                if (error.indexOf("already taken") > 0) {
-                                    // FIXME Use status codes...
-                                    callback.error("Username has already taken");
-                                }
-                                // TODO Reset status
-                                self.plugin.hangup();
-                                self.callOnEvent('stop', "error");
+                                console.debug(peer + " accepted the call!");
+                                self.peername = peer;
                             }
-                        },
-                        error: function (error) {
-                            Janus.error("  -- Error attaching plugin...", error);
+                            if (jsep)
+                                self.plugin.handleRemoteJsep({ jsep: jsep });
+                            self.callOnEvent('answered');
+                        } else if (event === 'update') {
+                            if (jsep) {
+                                if (jsep.type === "answer") {
+                                    self.plugin, handleRemoteJsep({ jsep: jsep });
+                                } else {
+                                    self.plugin, createAnswer(
+                                        {
+                                            jsep: jsep,
+                                            media: { data: true },
+                                            simulcast: false,
+                                            success: function (jsep) {
+                                                Janus.debug("Got SDP!");
+                                                Janus.debug(jsep);
+                                                var body = { "request": "set" };
+                                                self.plugin, send({ "message": body, "jsep": jsep });
+                                            },
+                                            error: function (error) {
+                                                Janus.error("WebRTC error:", error);
+                                            }
+                                        });
+                                }
+                            }
+                        } else if (event === 'stop') {
+                            console.debug("Stop event: " + call_state[result["call_state"]]);
+                            switch (call_state[result["call_state"]]) {
+                                case "CALL_ENDED":
+                                case "CALL_TIMEOUT":
+                                    console.debug("+ Start time: " + result["start_time"]);
+                                    console.debug("+ Stop time: " + result["stop_time"]);
+                                    if (result["record_path"])
+                                        console.debug("+ Record path: " + result["record_path"]);
+                                    break;
+                                case "CALL_ACCEPTED":
+                                    self.ringing(false);
+                                    break;
+                                case "CALL_BUSY":
+                                    bootbox.alert("Callee is busy now");
+                                    break;
+                            }
+                            self.plugin.hangup();
+                            self.callOnEvent('stop', result["call_state"]);
                         }
-                    });
+                        else if (event === "timeout") {
+                            self.hangup();
+                            self.ringing(false);
+                            console.debug("The call timeout. Hangup by user " + result["username"]);
+                        }
+                        else if (event === "simulcast") {
+                            // Is simulcast in place?
+                            console.debug("Simulcast event");
+                            var substream = result["substream"];
+                            var temporal = result["temporal"];
+                            if ((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
+                                if (!self.simulcastStarted) {
+                                    self.simulcastStarted = true;
+                                    self.addSimulcastButtons(result["videocodec"] === "vp8" || result["videocodec"] === "h264");
+                                }
+                                // We just received notice that there's been a switch, update the buttons
+                                self.updateSimulcastButtons(substream, temporal);
+                            }
+                        }
+                    }
+                } else {
+                    // FIXME Error?
+                    var error = msg["error"];
+                    bootbox.alert("Error: " + error);
+                    if (error.indexOf("already taken") > 0) {
+                        // FIXME Use status codes...
+                        callback.error("Username has already taken");
+                    }
+                    // TODO Reset status
+                    self.plugin.hangup();
+                    self.callOnEvent('stop', "error");
+                }
             },
             error: function (error) {
-                callback.error(error);
-            },
-            destroyed: function () {
-                window.location.reload();
+                Janus.error("  -- Error attaching plugin...", error);
             }
         });
+
 }
 
 VideoCall.prototype.disconnect = function () {
@@ -399,8 +384,6 @@ VideoCall.prototype.hangup = function () {
     this.plugin.send({ "message": hangup });
     //this.plugin.hangup();
 }
-
-
 
 // temp functions
 // Helpers to create Simulcast-related UI, if enabled
