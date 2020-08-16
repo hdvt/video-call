@@ -1200,6 +1200,7 @@ static void *janus_videocall_handler(void *data)
 			g_snprintf(error_cause, 512, "JSON error: not an object");
 			goto error;
 		}
+
 		JANUS_VALIDATE_JSON_OBJECT(root, request_parameters,
 								   error_code, error_cause, TRUE,
 								   JANUS_VIDEOCALL_ERROR_MISSING_ELEMENT, JANUS_VIDEOCALL_ERROR_INVALID_ELEMENT);

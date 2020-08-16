@@ -87,7 +87,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = docs
+subdir = html
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -278,8 +278,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@ENABLE_DOCS_TRUE@doxygendir = $(htmldir)/janus-gateway-$(VERSION)
-@ENABLE_DOCS_TRUE@EXTRA_DIST = html
+demodir = $(datadir)/janus/demos
 all: all-am
 
 .SUFFIXES:
@@ -292,9 +291,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign docs/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign html/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign docs/Makefile
+	  $(AUTOMAKE) --foreign html/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -389,10 +388,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-@ENABLE_DOCS_FALSE@clean-local:
-@ENABLE_DOCS_FALSE@install-data-local:
-@ENABLE_DOCS_FALSE@uninstall-local:
-@ENABLE_DOCS_FALSE@html-local:
 clean: clean-am
 
 clean-am: clean-generic clean-libtool clean-local mostlyclean-am
@@ -477,27 +472,19 @@ uninstall-am: uninstall-local
 .PRECIOUS: Makefile
 
 
-@ENABLE_DOCS_TRUE@all: html-local
+html-local:
+	true
 
-@ENABLE_DOCS_TRUE@html-local:
-@ENABLE_DOCS_TRUE@	doxygen janus-doxygen.cfg
-@ENABLE_DOCS_TRUE@	cp doxy-boot.js html/
-@ENABLE_DOCS_TRUE@	cp dynsections.js html/
-@ENABLE_DOCS_TRUE@	mkdir -p html/css
-@ENABLE_DOCS_TRUE@	cp ../html/css/demo.css html/css/
-@ENABLE_DOCS_TRUE@	mkdir -p html/js
-@ENABLE_DOCS_TRUE@	cp ../html/favicon.ico html/
-@ENABLE_DOCS_TRUE@	cp ../html/meetecho-logo.png html/
+install-data-local: html-local
+	$(MKDIR_P) $(DESTDIR)$(demodir)
+	cp -r * $(DESTDIR)$(demodir)
+	rm $(DESTDIR)$(demodir)/Makefile*
 
-@ENABLE_DOCS_TRUE@install-data-local: html-local
-@ENABLE_DOCS_TRUE@	$(MKDIR_P) $(DESTDIR)$(doxygendir)
-@ENABLE_DOCS_TRUE@	cp -r html/ $(DESTDIR)$(doxygendir)
+uninstall-local:
+	rm -rf $(DESTDIR)$(demodir)
 
-@ENABLE_DOCS_TRUE@uninstall-local:
-@ENABLE_DOCS_TRUE@	rm -rf $(DESTDIR)$(doxygendir)
-
-@ENABLE_DOCS_TRUE@clean-local:
-@ENABLE_DOCS_TRUE@	rm -rf $(builddir)/html
+clean-local:
+	true
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -181,7 +181,7 @@ VideoCall.prototype.connect = function (callback) {
                         } else if (event === 'update') {
                             if (jsep) {
                                 if (jsep.type === "answer") {
-                                    self.plugin, handleRemoteJsep({ jsep: jsep });
+                                    self.plugin.handleRemoteJsep({ jsep: jsep });
                                 } else {
                                     self.plugin, createAnswer(
                                         {
@@ -264,12 +264,11 @@ VideoCall.prototype.disconnect = function () {
     this.plugin.detach();
 }
 // register user
-VideoCall.prototype.register = function (token, callback) {
-    var self = this;
+VideoCall.register = function (token, callback) {
     var request = { "janus": "add_token", "token": token, plugins: ["janus.plugin.videocall"], "transaction": Janus.randomString(12), "admin_secret": "1231234" };
     $.ajax({
         type: 'POST',
-        url: self.admin_server,
+        url: "https://" + window.location.hostname + "/janus-admin",
         cache: false,
         contentType: "application/json",
         data: JSON.stringify(request),
